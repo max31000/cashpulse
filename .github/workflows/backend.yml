@@ -67,6 +67,7 @@ jobs:
           host: ${{ secrets.VDS_HOST }}
           username: ${{ secrets.VDS_USER }}
           key: ${{ secrets.VDS_SSH_KEY }}
+          envs: DB_CONNECTION_STRING
           script: |
             set -e
             cd /opt/cashpulse
@@ -86,8 +87,12 @@ jobs:
               -p 5000:5000 \
               -e ASPNETCORE_ENVIRONMENT=Production \
               -e ASPNETCORE_URLS=http://+:5000 \
-              -e "ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION_STRING }}" \
+              -e "ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}" \
               cashpulse-api:latest
 
-            echo "=== Deployment complete ==="
+            echo "=== Waiting for API to start ==="
+            sleep 5
             docker ps | grep cashpulse
+            echo "=== Deployment complete ==="
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}

@@ -14,8 +14,10 @@ concurrency:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # required for gh-pages branch
+    # NOTE: когда репозиторий станет публичным — раскомментировать блок ниже
+    # и удалить шаг "Deploy to VDS via SCP"
+    # permissions:
+    #   contents: write  # required for gh-pages branch
 
     steps:
       - name: Checkout
@@ -26,15 +28,12 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Enable Corepack (Yarn 4)
-        run: corepack enable
-
       - name: Install dependencies
-        run: yarn install --immutable
+        run: yarn install --frozen-lockfile
         working-directory: cashpulse-web
 
       - name: Type check
-        run: yarn tsc --noEmit
+        run: yarn typecheck
         working-directory: cashpulse-web
 
       - name: Build
@@ -43,9 +42,23 @@ jobs:
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
-      - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4
+      # Деплой на VDS через SCP (пока репозиторий приватный)
+      # Когда репозиторий станет публичным — заменить на GitHub Pages (см. комментарий ниже)
+      - name: Deploy to VDS via SCP
+        uses: appleboy/scp-action@v0.1.7
         with:
-          folder: cashpulse-web/dist
-          branch: gh-pages
-          clean: true
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          source: cashpulse-web/dist/*
+          target: /var/www/cashpulse/
+          strip_components: 2
+          rm: true
+
+      # FUTURE: GitHub Pages (раскомментировать когда репо станет публичным)
+      # - name: Deploy to GitHub Pages
+      #   uses: JamesIves/github-pages-deploy-action@v4
+      #   with:
+      #     folder: cashpulse-web/dist
+      #     branch: gh-pages
+      #     clean: true
