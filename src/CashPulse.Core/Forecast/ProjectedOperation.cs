@@ -1,0 +1,15 @@
+namespace CashPulse.Core.Forecast;
+
+public record ProjectedOperation
+{
+    public DateOnly Date { get; init; }
+    public decimal Amount { get; init; }
+    public string Currency { get; init; } = string.Empty;
+    public long AccountId { get; init; }
+    public long? CategoryId { get; init; }
+    public List<string>? Tags { get; init; }
+    public string? Description { get; init; }
+    public long TemplateOperationId { get; init; }
+    public long? ScenarioId { get; init; }
+    public bool IsRecurring { get; init; } = true;
+}

@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: cashpulse-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-cashpulse_dev}
+      MYSQL_DATABASE: cashpulse
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cashpulse-network
+
+  api:
+    build:
+      context: .
+      dockerfile: src/CashPulse.Api/Dockerfile
+    container_name: cashpulse-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:5000
+      ConnectionStrings__DefaultConnection: "Server=mysql;Database=cashpulse;User=root;Password=${MYSQL_ROOT_PASSWORD:-cashpulse_dev};"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - cashpulse-network
+
+volumes:
+  mysql_data:
+
+networks:
+  cashpulse-network:
+    name: cashpulse-network
+    # external: true  # раскомментировать на VDS если сеть создана вручную через deploy-vds.sh

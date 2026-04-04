@@ -1,0 +1,93 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'CashPulse.sln'
+      - '.github/workflows/backend.yml'
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.sln') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore CashPulse.sln
+
+      - name: Build
+        run: dotnet build CashPulse.sln --no-restore -c Release
+
+      - name: Test
+        run: dotnet test CashPulse.sln --no-build -c Release --verbosity normal
+
+      - name: Publish
+        run: dotnet publish src/CashPulse.Api/CashPulse.Api.csproj -c Release -o ./publish --no-restore
+
+      - name: Build Docker image
+        run: docker build -t cashpulse-api:latest -f src/CashPulse.Api/Dockerfile .
+
+      - name: Save Docker image
+        run: docker save cashpulse-api:latest | gzip > cashpulse-api.tar.gz
+
+      - name: Copy image to VDS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          source: cashpulse-api.tar.gz
+          target: /opt/cashpulse/
+
+      - name: Deploy on VDS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/cashpulse
+
+            echo "=== Loading Docker image ==="
+            docker load < cashpulse-api.tar.gz
+
+            echo "=== Stopping old container (if exists) ==="
+            docker stop cashpulse-api || true
+            docker rm cashpulse-api || true
+
+            echo "=== Starting new container ==="
+            docker run -d \
+              --name cashpulse-api \
+              --network cashpulse-network \
+              --restart unless-stopped \
+              -p 5000:5000 \
+              -e ASPNETCORE_ENVIRONMENT=Production \
+              -e ASPNETCORE_URLS=http://+:5000 \
+              -e "ConnectionStrings__DefaultConnection=${{ secrets.DB_CONNECTION_STRING }}" \
+              cashpulse-api:latest
+
+            echo "=== Deployment complete ==="
+            docker ps | grep cashpulse

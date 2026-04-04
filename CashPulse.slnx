@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CashPulse.Api/CashPulse.Api.csproj" />
+    <Project Path="src/CashPulse.Core/CashPulse.Core.csproj" />
+    <Project Path="src/CashPulse.Infrastructure/CashPulse.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CashPulse.Tests/CashPulse.Tests.csproj" />
+  </Folder>
+</Solution>

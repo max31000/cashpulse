@@ -1,0 +1,29 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+publish/
+
+# Node
+cashpulse-web/node_modules/
+cashpulse-web/dist/
+cashpulse-web/.yarn/cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Docker artifacts
+cashpulse-api.tar.gz
