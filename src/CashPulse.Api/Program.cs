@@ -4,12 +4,15 @@ using CashPulse.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// CORS
+// CORS — origins читаются из конфига, чтобы не хардкодить IP/домен в коде
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        var origins = new[] { "https://max31000.github.io", "http://localhost:5173" };
+        var origins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>()
+            ?? ["http://localhost:5173"];
         policy.WithOrigins(origins)
               .AllowAnyHeader()
               .AllowAnyMethod();
