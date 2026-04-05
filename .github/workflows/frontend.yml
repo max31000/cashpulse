@@ -41,7 +41,9 @@ jobs:
         run: yarn build
         working-directory: cashpulse-web
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          # Пустая строка = API на том же домене через nginx /api/ (относительный путь)
+          # Для локальной разработки задать VITE_API_URL=http://localhost:5000 в .env
+          VITE_API_URL: ""
           VITE_TELEGRAM_BOT_USERNAME: mv_cashpulse_bot
 
       # Деплой на VDS через SCP (пока репозиторий приватный)
