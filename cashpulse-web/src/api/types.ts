@@ -209,3 +209,88 @@ export interface ImportResultResponse {
   errors: string[];
   message: string;
 }
+
+// ─── Income Sources ───────────────────────────────────────────────
+export type AmountMode = 'Fixed' | 'PercentOfTotal' | 'Estimated';
+export type DistributionValueMode = 'Percent' | 'FixedAmount' | 'Remainder';
+
+export interface DistributionRule {
+  id?: number;
+  trancheId?: number;
+  accountId: number;
+  currency?: string;
+  valueMode: DistributionValueMode;
+  percent?: number;
+  fixedAmount?: number;
+  delayDays: number;
+  categoryId?: number;
+  tags?: string[];
+  sortOrder?: number;
+}
+
+export interface IncomeTranche {
+  id?: number;
+  incomeSourceId?: number;
+  name: string;
+  dayOfMonth: number;
+  amountMode: AmountMode;
+  fixedAmount?: number;
+  percentOfTotal?: number;
+  estimatedMin?: number;
+  estimatedMax?: number;
+  sortOrder?: number;
+  distributionRules: DistributionRule[];
+}
+
+export interface IncomeSource {
+  id: number;
+  userId: number;
+  name: string;
+  currency: string;
+  expectedTotal?: number;
+  isActive: boolean;
+  description?: string;
+  tranches: IncomeTranche[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateIncomeSourceDto {
+  name: string;
+  currency: string;
+  expectedTotal?: number;
+  isActive?: boolean;
+  description?: string;
+  tranches: Omit<IncomeTranche, 'id' | 'incomeSourceId'>[];
+}
+
+export interface GenerateOperationsRequest {
+  from: string;
+  to: string;
+  preview: boolean;
+  actualAmount?: number;
+  trancheId?: number;
+}
+
+export interface GeneratedOpDto {
+  date: string;
+  accountId: number;
+  amount: number;
+  currency: string;
+  categoryId?: number;
+  tags: string[];
+  description?: string;
+  trancheId: number;
+  trancheName: string;
+  isDuplicate: boolean;
+}
+
+export interface GeneratePreviewResponse {
+  operations: GeneratedOpDto[];
+}
+
+export interface ConfirmTrancheRequest {
+  trancheId: number;
+  month: string;
+  actualAmount: number;
+}

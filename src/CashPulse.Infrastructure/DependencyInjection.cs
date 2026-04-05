@@ -37,6 +37,10 @@ public static class DependencyInjection
         // Auth services (IConfiguration резолвится из DI контейнера — он зарегистрирован как singleton)
         services.AddScoped<ITelegramAuthService, TelegramAuthService>();
 
+        // Income sources
+        services.AddScoped<IIncomeSourceRepository>(_ => new IncomeSourceRepository(connectionString));
+        services.AddTransient<IncomeSourceExpander>();
+
         // Domain services
         services.AddTransient<ForecastEngine>();
 

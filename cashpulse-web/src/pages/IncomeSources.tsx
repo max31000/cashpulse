@@ -1,113 +1,205 @@
 import { useEffect, useState } from 'react';
-import { Stack, Title, Button, Text, Paper, Group, Badge, Skeleton } from '@mantine/core';
+import {
+  Stack, Title, Group, Button, Text, Card, Badge, Skeleton,
+} from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { useOperationStore } from '../store/useOperationStore';
+import { notifications } from '@mantine/notifications';
+import { useIncomeSourceStore } from '../store/useIncomeSourceStore';
 import { useAccountStore } from '../store/useAccountStore';
 import { useCategoryStore } from '../store/useCategoryStore';
-import { useScenarioStore } from '../store/useScenarioStore';
-import { OperationForm } from '../components/OperationForm/OperationForm';
-import type { PlannedOperation } from '../api/types';
+import { toggleIncomeSourceActive } from '../api/incomeSources';
+import type { IncomeSource } from '../api/types';
 import { formatMoney } from '../utils/formatMoney';
+import { IncomeSourceFormModal } from '../components/IncomeSourceForm/IncomeSourceFormModal';
+import { GenerateOperationsModal } from '../components/IncomeSourceForm/GenerateOperationsModal';
 
-const RECURRENCE_LABELS: Record<string, string> = {
-  daily: 'Ежедневно',
-  weekly: 'Еженедельно',
-  biweekly: 'Каждые 2 недели',
-  monthly: 'Ежемесячно',
-  quarterly: 'Ежеквартально',
-  yearly: 'Ежегодно',
-  custom: 'Произвольно',
-};
+// ─── Card component ──────────────────────────────────────────────────────────
+
+interface IncomeSourceCardProps {
+  source: IncomeSource;
+  onEdit: (s: IncomeSource) => void;
+  onGenerate: (s: IncomeSource) => void;
+  onToggleActive: (s: IncomeSource) => void;
+}
+
+function IncomeSourceCard({ source, onEdit, onGenerate, onToggleActive }: IncomeSourceCardProps) {
+  return (
+    <Card withBorder p="lg" radius="md" shadow="sm">
+      <Card.Section withBorder inheritPadding py="xs">
+        <Group justify="space-between">
+          <Group gap="xs">
+            <Text fw={700} fz="lg">{source.name}</Text>
+            <Badge
+              size="sm"
+              color={source.isActive ? 'green' : 'gray'}
+              variant="light"
+            >
+              {source.isActive ? 'Активен' : 'Неактивен'}
+            </Badge>
+          </Group>
+          {source.expectedTotal !== undefined && source.expectedTotal > 0 && (
+            <Text fz="xl" fw={700} c="green">
+              {formatMoney(source.expectedTotal, source.currency)} / мес
+            </Text>
+          )}
+        </Group>
+      </Card.Section>
+
+      <Stack gap={4} mt="sm">
+        <Group gap="md">
+          <Group gap={4}>
+            <Text fz="xs" c="dimmed">Валюта:</Text>
+            <Badge size="xs" variant="outline">{source.currency}</Badge>
+          </Group>
+          <Group gap={4}>
+            <Text fz="xs" c="dimmed">Траншей:</Text>
+            <Text fz="xs" fw={600}>{source.tranches.length}</Text>
+          </Group>
+        </Group>
+
+        {source.tranches.slice(0, 2).map((t) => (
+          <Text key={t.id ?? t.name} fz="xs" c="dimmed">
+            · {t.name} — {t.dayOfMonth === -1 ? 'последний день' : `${t.dayOfMonth}-го`}
+            {' '}({t.amountMode === 'Fixed'
+              ? formatMoney(t.fixedAmount ?? 0, source.currency)
+              : t.amountMode === 'PercentOfTotal'
+              ? `${t.percentOfTotal}% от ${formatMoney(source.expectedTotal ?? 0, source.currency)}`
+              : `≈ ${formatMoney(t.fixedAmount ?? 0, source.currency)}`
+            })
+          </Text>
+        ))}
+        {source.tranches.length > 2 && (
+          <Text fz="xs" c="dimmed">+ ещё {source.tranches.length - 2} транша</Text>
+        )}
+      </Stack>
+
+      <Card.Section withBorder inheritPadding pt="sm" mt="md">
+        <Group justify="space-between">
+          <Group gap="xs">
+            <Button
+              variant="subtle"
+              size="xs"
+              onClick={(e) => { e.stopPropagation(); onEdit(source); }}
+            >
+              ✏️ Редактировать
+            </Button>
+            <Button
+              variant="subtle"
+              size="xs"
+              color={source.isActive ? 'gray' : 'green'}
+              onClick={(e) => { e.stopPropagation(); onToggleActive(source); }}
+            >
+              {source.isActive ? '⏸ Деактивировать' : '▶ Активировать'}
+            </Button>
+          </Group>
+          <Button
+            variant="light"
+            size="xs"
+            color="blue"
+            onClick={(e) => { e.stopPropagation(); onGenerate(source); }}
+          >
+            ⚡ Сгенерировать операции
+          </Button>
+        </Group>
+      </Card.Section>
+    </Card>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function IncomeSources() {
-  const { operations, loading, fetch: fetchOps } = useOperationStore();
+  const { sources, loading, fetch } = useIncomeSourceStore();
   const { accounts, fetch: fetchAccounts } = useAccountStore();
   const { categories, fetch: fetchCategories } = useCategoryStore();
-  const { scenarios, fetch: fetchScenarios } = useScenarioStore();
-  const [formOpened, { open, close }] = useDisclosure(false);
-  const [editingOp, setEditingOp] = useState<PlannedOperation | undefined>();
+
+  const [formOpened, { open: openForm, close: closeForm }] = useDisclosure(false);
+  const [generateOpened, { open: openGenerate, close: closeGenerate }] = useDisclosure(false);
+  const [editingSource, setEditingSource] = useState<IncomeSource | undefined>();
+  const [generatingSource, setGeneratingSource] = useState<IncomeSource | undefined>();
 
   useEffect(() => {
-    void fetchOps({ limit: 500 });
+    void fetch();
     void fetchAccounts();
     void fetchCategories();
-    void fetchScenarios();
   }, []);
 
-  // Фильтруем: повторяющиеся + доход (amount > 0)
-  const incomeSources = operations.filter(
-    (op) => op.recurrenceRuleId != null && op.amount > 0
-  );
+  const handleEdit = (s: IncomeSource) => { setEditingSource(s); openForm(); };
+  const handleAdd = () => { setEditingSource(undefined); openForm(); };
+  const handleGenerate = (s: IncomeSource) => { setGeneratingSource(s); openGenerate(); };
 
-  const accountName = (id: number) =>
-    accounts.find((a) => a.id === id)?.name ?? `Счёт #${id}`;
-
-  const handleEdit = (op: PlannedOperation) => {
-    setEditingOp(op);
-    open();
-  };
-
-  const handleAdd = () => {
-    setEditingOp(undefined);
-    open();
+  const handleToggleActive = async (s: IncomeSource) => {
+    try {
+      const updated = await toggleIncomeSourceActive(s.id, !s.isActive);
+      useIncomeSourceStore.getState().updateSource(updated);
+      notifications.show({
+        title: updated.isActive ? 'Активирован' : 'Деактивирован',
+        message: `"${updated.name}" обновлён`,
+        color: 'green',
+      });
+    } catch (e) {
+      notifications.show({ title: 'Ошибка', message: (e as Error).message, color: 'red' });
+    }
   };
 
   return (
     <Stack gap="md">
       <Group justify="space-between">
         <Title order={2}>Источники дохода</Title>
-        <Button onClick={handleAdd}>+ Добавить</Button>
+        <Button variant="filled" onClick={handleAdd}>+ Источник дохода</Button>
       </Group>
-
-      <Text c="dimmed" size="sm">
-        Регулярные поступления: зарплата, проценты по вкладам, купоны и другие стабильные доходы.
+      <Text c="dimmed" fz="sm">
+        Зарплата, вклады, купоны и другие регулярные поступления с разбивкой по счетам.
       </Text>
 
-      {loading && <Skeleton h={80} />}
-
-      {!loading && incomeSources.length === 0 && (
-        <Paper p="xl" withBorder ta="center">
-          <Text c="dimmed">Нет источников дохода. Добавьте первый.</Text>
-        </Paper>
+      {loading ? (
+        <Stack gap="sm">
+          {[1, 2, 3].map((i) => <Skeleton key={i} h={120} radius="md" />)}
+        </Stack>
+      ) : sources.length === 0 ? (
+        <Stack align="center" py="xl" gap="sm">
+          <Text fz="4xl">💵</Text>
+          <Text fw={600}>Нет источников дохода</Text>
+          <Text c="dimmed" fz="sm" ta="center" maw={320}>
+            Добавьте первый источник, чтобы отслеживать поступления и автоматически
+            распределять их по счетам
+          </Text>
+          <Button onClick={handleAdd}>+ Источник дохода</Button>
+        </Stack>
+      ) : (
+        <Stack gap="sm">
+          {sources.map((s) => (
+            <IncomeSourceCard
+              key={s.id}
+              source={s}
+              onEdit={handleEdit}
+              onGenerate={handleGenerate}
+              onToggleActive={handleToggleActive}
+            />
+          ))}
+        </Stack>
       )}
 
-      {incomeSources.map((op) => (
-        <Paper key={op.id} p="md" withBorder style={{ cursor: 'pointer' }}
-          onClick={() => handleEdit(op)}>
-          <Group justify="space-between">
-            <Stack gap={4}>
-              <Group gap="xs">
-                <Text fw={600}>{op.description || 'Без описания'}</Text>
-                {op.tags?.map((tag) => (
-                  <Badge key={tag} size="xs" variant="light">{tag}</Badge>
-                ))}
-              </Group>
-              <Text size="sm" c="dimmed">
-                {accountName(op.accountId)}
-                {op.recurrenceRule && ` · ${RECURRENCE_LABELS[op.recurrenceRule.type] ?? op.recurrenceRule.type}`}
-                {op.recurrenceRule?.dayOfMonth && ` · ${op.recurrenceRule.dayOfMonth}-го числа`}
-              </Text>
-            </Stack>
-            <Text fw={700} c="green" size="lg">
-              +{formatMoney(op.amount, op.currency)}
-            </Text>
-          </Group>
-        </Paper>
-      ))}
-
-      <OperationForm
+      <IncomeSourceFormModal
         opened={formOpened}
-        onClose={close}
-        onSave={(savedOp) => {
-          if (editingOp) useOperationStore.getState().updateOperation(savedOp);
-          else useOperationStore.getState().addOperation(savedOp);
-          close();
-        }}
+        onClose={closeForm}
+        initial={editingSource}
         accounts={accounts}
         categories={categories}
-        scenarios={scenarios}
-        initialValues={editingOp}
+        onSave={(saved) => {
+          if (editingSource) useIncomeSourceStore.getState().updateSource(saved);
+          else useIncomeSourceStore.getState().addSource(saved);
+        }}
       />
+
+      {generatingSource && (
+        <GenerateOperationsModal
+          opened={generateOpened}
+          onClose={closeGenerate}
+          source={generatingSource}
+          accounts={accounts}
+        />
+      )}
     </Stack>
   );
 }

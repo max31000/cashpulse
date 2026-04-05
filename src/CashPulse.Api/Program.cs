@@ -75,6 +75,7 @@ app.MapTagsEndpoints();
 app.MapExchangeRatesEndpoints();
 app.MapImportEndpoints();
 app.MapBalanceSnapshotsEndpoints();
+app.MapIncomeSourceEndpoints();
 
 // Health check
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
