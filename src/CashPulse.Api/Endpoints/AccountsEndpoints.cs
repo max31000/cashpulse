@@ -57,6 +57,7 @@ public static class AccountsEndpoints
             DepositEndDate = req.DepositEndDate,
             CanTopUpAlways = req.CanTopUpAlways,
             CanWithdraw = req.CanWithdraw,
+            DailyAccrual = req.DailyAccrual,
             InvestmentSubtype = req.InvestmentSubtype,
             GracePeriodEndDate = req.GracePeriodEndDate
         };
@@ -97,6 +98,7 @@ public static class AccountsEndpoints
         existing.DepositEndDate = req.DepositEndDate ?? existing.DepositEndDate;
         existing.CanTopUpAlways = req.CanTopUpAlways ?? existing.CanTopUpAlways;
         existing.CanWithdraw = req.CanWithdraw ?? existing.CanWithdraw;
+        existing.DailyAccrual = req.DailyAccrual ?? existing.DailyAccrual;
         existing.InvestmentSubtype = req.InvestmentSubtype ?? existing.InvestmentSubtype;
         existing.GracePeriodEndDate = req.GracePeriodEndDate ?? existing.GracePeriodEndDate;
 
@@ -148,6 +150,7 @@ public record AccountCreateRequest(
     DateOnly? DepositEndDate = null,
     bool? CanTopUpAlways = null,
     bool? CanWithdraw = null,
+    bool? DailyAccrual = null,
     string? InvestmentSubtype = null,
     DateOnly? GracePeriodEndDate = null);
 
@@ -165,6 +168,7 @@ public record AccountUpdateRequest(
     DateOnly? DepositEndDate = null,
     bool? CanTopUpAlways = null,
     bool? CanWithdraw = null,
+    bool? DailyAccrual = null,
     string? InvestmentSubtype = null,
     DateOnly? GracePeriodEndDate = null);
 

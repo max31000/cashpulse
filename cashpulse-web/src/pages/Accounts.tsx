@@ -28,6 +28,7 @@ interface FormValues {
   depositEndDate: string;
   canTopUpAlways: boolean;
   canWithdraw: boolean;
+  dailyAccrual: boolean;
   investmentSubtype: string;
   gracePeriodEndDate: string;
 }
@@ -54,6 +55,7 @@ function AccountModal({ opened, onClose, onSave, initial }: {
       depositEndDate: initial?.depositEndDate ?? '',
       canTopUpAlways: initial?.canTopUpAlways ?? true,
       canWithdraw: initial?.canWithdraw ?? false,
+      dailyAccrual: initial?.dailyAccrual ?? false,
       investmentSubtype: initial?.investmentSubtype ?? '',
       gracePeriodEndDate: initial?.gracePeriodEndDate ?? '',
     },
@@ -80,6 +82,7 @@ function AccountModal({ opened, onClose, onSave, initial }: {
         depositEndDate: values.depositEndDate || undefined,
         canTopUpAlways: values.type === 'deposit' ? values.canTopUpAlways : undefined,
         canWithdraw: values.type === 'deposit' ? values.canWithdraw : undefined,
+        dailyAccrual: values.type === 'deposit' ? values.dailyAccrual : undefined,
         investmentSubtype: values.type === 'investment' ? values.investmentSubtype || undefined : undefined,
         gracePeriodEndDate: values.type === 'credit' ? values.gracePeriodEndDate || undefined : undefined,
       };
@@ -145,17 +148,22 @@ function AccountModal({ opened, onClose, onSave, initial }: {
           {form.values.type === 'deposit' && (
             <>
               <Divider label="Параметры вклада" labelPosition="left" my="xs" />
-              <Group grow>
-                <NumberInput
-                  label="Годовая ставка"
-                  description="Например: 16.5 для 16.5% годовых"
-                  required
-                  min={0.01}
-                  max={100}
-                  decimalScale={2}
-                  suffix="%"
-                  {...form.getInputProps('interestRate')}
-                />
+              <NumberInput
+                label="Годовая ставка"
+                description="Например: 16.5 для 16.5% годовых"
+                required
+                min={0.01}
+                max={100}
+                decimalScale={2}
+                suffix="%"
+                {...form.getInputProps('interestRate')}
+              />
+              <Switch
+                label="Ежедневное начисление"
+                description="Проценты зачисляются каждый день (как в Райффайзенбанке)"
+                {...form.getInputProps('dailyAccrual', { type: 'checkbox' })}
+              />
+              {!form.values.dailyAccrual && (
                 <NumberInput
                   label="День начисления процентов"
                   description="Число месяца (1-28)"
@@ -164,7 +172,7 @@ function AccountModal({ opened, onClose, onSave, initial }: {
                   max={28}
                   {...form.getInputProps('interestAccrualDay')}
                 />
-              </Group>
+              )}
               <TextInput
                 label="Дата окончания вклада"
                 description="Оставьте пустым для бессрочного вклада"
@@ -319,7 +327,7 @@ export default function Accounts() {
           <Text size="sm" c="dimmed">
             {acc.interestRate}% годовых
             {acc.depositEndDate && ` · до ${new Date(acc.depositEndDate).toLocaleDateString('ru-RU')}`}
-            {acc.interestAccrualDay && ` · начисление ${acc.interestAccrualDay}-го`}
+            {acc.dailyAccrual ? ' · ежедневное начисление' : acc.interestAccrualDay ? ` · начисление ${acc.interestAccrualDay}-го` : ''}
           </Text>
         )}
 

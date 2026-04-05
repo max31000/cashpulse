@@ -25,7 +25,7 @@ public class AccountRepository : IAccountRepository
             SELECT Id, UserId, Name, Type, CreditLimit, GracePeriodDays, MinPaymentPercent,
                    StatementDay, DueDay, IsArchived, SortOrder, CreatedAt, UpdatedAt,
                    InterestRate, InterestAccrualDay, DepositEndDate, CanTopUpAlways,
-                   CanWithdraw, InvestmentSubtype, GracePeriodEndDate
+                   CanWithdraw, DailyAccrual, InvestmentSubtype, GracePeriodEndDate
             FROM Accounts
             WHERE UserId = @UserId AND IsArchived = 0
             ORDER BY SortOrder, Id";
@@ -49,7 +49,7 @@ public class AccountRepository : IAccountRepository
             SELECT Id, UserId, Name, Type, CreditLimit, GracePeriodDays, MinPaymentPercent,
                    StatementDay, DueDay, IsArchived, SortOrder, CreatedAt, UpdatedAt,
                    InterestRate, InterestAccrualDay, DepositEndDate, CanTopUpAlways,
-                   CanWithdraw, InvestmentSubtype, GracePeriodEndDate
+                   CanWithdraw, DailyAccrual, InvestmentSubtype, GracePeriodEndDate
             FROM Accounts
             WHERE Id = @Id AND UserId = @UserId";
 
@@ -68,11 +68,11 @@ public class AccountRepository : IAccountRepository
             INSERT INTO Accounts (UserId, Name, Type, CreditLimit, GracePeriodDays, MinPaymentPercent,
                                   StatementDay, DueDay, IsArchived, SortOrder,
                                   InterestRate, InterestAccrualDay, DepositEndDate, CanTopUpAlways,
-                                  CanWithdraw, InvestmentSubtype, GracePeriodEndDate)
+                                  CanWithdraw, DailyAccrual, InvestmentSubtype, GracePeriodEndDate)
             VALUES (@UserId, @Name, @Type, @CreditLimit, @GracePeriodDays, @MinPaymentPercent,
                     @StatementDay, @DueDay, @IsArchived, @SortOrder,
                     @InterestRate, @InterestAccrualDay, @DepositEndDate, @CanTopUpAlways,
-                    @CanWithdraw, @InvestmentSubtype, @GracePeriodEndDate);
+                    @CanWithdraw, @DailyAccrual, @InvestmentSubtype, @GracePeriodEndDate);
             SELECT LAST_INSERT_ID();";
 
         return await conn.ExecuteScalarAsync<ulong>(sql, new
@@ -92,6 +92,7 @@ public class AccountRepository : IAccountRepository
             account.DepositEndDate,
             account.CanTopUpAlways,
             account.CanWithdraw,
+            account.DailyAccrual,
             account.InvestmentSubtype,
             account.GracePeriodEndDate
         });
@@ -107,7 +108,8 @@ public class AccountRepository : IAccountRepository
                 StatementDay = @StatementDay, DueDay = @DueDay, SortOrder = @SortOrder,
                 InterestRate = @InterestRate, InterestAccrualDay = @InterestAccrualDay,
                 DepositEndDate = @DepositEndDate, CanTopUpAlways = @CanTopUpAlways,
-                CanWithdraw = @CanWithdraw, InvestmentSubtype = @InvestmentSubtype,
+                CanWithdraw = @CanWithdraw, DailyAccrual = @DailyAccrual,
+                InvestmentSubtype = @InvestmentSubtype,
                 GracePeriodEndDate = @GracePeriodEndDate
             WHERE Id = @Id AND UserId = @UserId";
 
@@ -126,6 +128,7 @@ public class AccountRepository : IAccountRepository
             account.DepositEndDate,
             account.CanTopUpAlways,
             account.CanWithdraw,
+            account.DailyAccrual,
             account.InvestmentSubtype,
             account.GracePeriodEndDate,
             account.Id,
@@ -192,6 +195,7 @@ public class AccountRepository : IAccountRepository
             DepositEndDate = row.DepositEndDate,
             CanTopUpAlways = row.CanTopUpAlways,
             CanWithdraw = row.CanWithdraw,
+            DailyAccrual = row.DailyAccrual,
             InvestmentSubtype = row.InvestmentSubtype,
             GracePeriodEndDate = row.GracePeriodEndDate
         };
@@ -217,6 +221,7 @@ public class AccountRepository : IAccountRepository
         public DateOnly? DepositEndDate { get; set; }
         public bool? CanTopUpAlways { get; set; }
         public bool? CanWithdraw { get; set; }
+        public bool? DailyAccrual { get; set; }
         public string? InvestmentSubtype { get; set; }
         public DateOnly? GracePeriodEndDate { get; set; }
     }

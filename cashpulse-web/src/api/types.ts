@@ -27,6 +27,7 @@ export interface Account {
   depositEndDate?: string;
   canTopUpAlways?: boolean;
   canWithdraw?: boolean;
+  dailyAccrual?: boolean;
   // Investment accounts (type='investment')
   investmentSubtype?: 'savings' | 'bonds' | 'stocks';
   // Credit cards (type='credit')
@@ -176,6 +177,7 @@ export interface CreateAccountDto {
   depositEndDate?: string;
   canTopUpAlways?: boolean;
   canWithdraw?: boolean;
+  dailyAccrual?: boolean;
   investmentSubtype?: string;
   gracePeriodEndDate?: string;
 }

@@ -18,6 +18,7 @@ public class Account
     public DateOnly? DepositEndDate { get; set; }
     public bool? CanTopUpAlways { get; set; }
     public bool? CanWithdraw { get; set; }
+    public bool? DailyAccrual { get; set; }
 
     // Investment accounts (Type = Investment)
     public string? InvestmentSubtype { get; set; }
