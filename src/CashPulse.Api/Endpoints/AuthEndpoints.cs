@@ -28,8 +28,10 @@ public static class AuthEndpoints
     {
         // 1. Проверяем подпись Telegram
         if (!telegramAuth.ValidateAuthData(data))
-            return Results.Json(new { error = "Недействительные данные авторизации Telegram" },
-                statusCode: 401);
+        {
+            var response = new { error = "Недействительные данные авторизации Telegram" };
+            return Results.Json(response, statusCode: 401);
+        }
 
         // 2. Находим или создаём пользователя
         var user = await userRepo.GetByTelegramIdAsync(data.Id);
