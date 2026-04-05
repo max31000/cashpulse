@@ -211,7 +211,8 @@ public class OperationRepository : IOperationRepository
                    p.Description, p.OperationDate, p.RecurrenceRuleId, p.IsConfirmed, p.ScenarioId,
                    p.CreatedAt, p.UpdatedAt
             FROM PlannedOperations p
-            WHERE p.UserId = @UserId";
+            WHERE p.UserId = @UserId
+              AND p.IsConfirmed = FALSE";
 
         var rows = await conn.QueryAsync<OperationRow>(sql, new { UserId = userId });
         var ops = rows.Select(MapToOperation).ToList();

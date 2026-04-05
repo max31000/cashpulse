@@ -153,7 +153,7 @@ export default function AccountDetail() {
                         borderLeft: `4px ${isFuture ? 'dashed' : 'solid'} ${op.isConfirmed ? '#22C55E' : '#3B82F6'}`,
                       }}>
                       <Group justify="space-between" wrap="nowrap">
-                        <Group gap="sm" wrap="nowrap" style={{ flex: 1 }}>
+                        <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
                           <Stack gap={2}>
                             <Text fw={600} fz="sm">{op.description ?? `#${op.id}`}</Text>
                             <Group gap={4}>
@@ -162,7 +162,7 @@ export default function AccountDetail() {
                             </Group>
                           </Stack>
                         </Group>
-                        <Group gap="xs" wrap="nowrap">
+                        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
                           <Text fz="sm" fw={700} c={op.amount >= 0 ? 'green' : 'red'}>
                             {formatMoneyWithSign(op.amount, op.currency)}
                           </Text>

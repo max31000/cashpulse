@@ -35,19 +35,40 @@ public static class ForecastEndpoints
     /// </summary>
     private static ForecastResponseDto MapToForecastResponse(ForecastResult result)
     {
-        // Group AccountTimelines by currency and merge all accounts' BalancePoints
+        // Group AccountTimelines by currency and merge with forward-fill so that
+        // every account contributes its last known balance on each date, not just
+        // accounts that happen to have a point exactly on that date.
         var timelines = result.AccountTimelines
             .GroupBy(t => t.Currency)
             .ToDictionary(
                 g => g.Key,
-                g => g.SelectMany(t => t.Points)
-                      .GroupBy(p => p.Date)
-                      .Select(pg => new TimelinePointDto(
-                          pg.Key.ToString("yyyy-MM-dd"),
-                          pg.Sum(p => p.Balance),
-                          pg.Any(p => p.IsScenario)))
-                      .OrderBy(p => p.Date)
-                      .ToList()
+                g =>
+                {
+                    var accountsInCurrency = g.ToList();
+
+                    var allDates = accountsInCurrency
+                        .SelectMany(t => t.Points.Select(p => p.Date))
+                        .Distinct()
+                        .OrderBy(d => d)
+                        .ToList();
+
+                    return allDates.Select(date =>
+                    {
+                        var totalBalance = accountsInCurrency.Sum(t =>
+                            t.Points
+                                .Where(p => p.Date <= date)
+                                .OrderByDescending(p => p.Date)
+                                .FirstOrDefault()?.Balance ?? 0m);
+
+                        var isScenario = accountsInCurrency.Any(t =>
+                            t.Points.Any(p => p.Date == date && p.IsScenario));
+
+                        return new TimelinePointDto(
+                            date.ToString("yyyy-MM-dd"),
+                            totalBalance,
+                            isScenario);
+                    }).ToList();
+                }
             );
 
         var netWorth = result.NetWorthTimeline
