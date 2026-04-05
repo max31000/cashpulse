@@ -41,8 +41,8 @@ jobs:
         run: yarn build
         working-directory: cashpulse-web
         env:
-          # HTTPS через порт 8443 (443 занят amnezia VPN на VDS)
-          VITE_API_URL: "https://mvv42.ru:8443"
+          # API на том же домене через nginx /api/ proxy
+          VITE_API_URL: "https://mvv42.ru"
           VITE_TELEGRAM_BOT_USERNAME: mv_cashpulse_bot
 
       # Деплой на VDS через SCP (пока репозиторий приватный)
