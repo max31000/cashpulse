@@ -39,6 +39,7 @@ interface FormValues {
   startDate: string;
   endDate: string;
   noEndDate: boolean;
+  isConfirmed: boolean;
 }
 
 export function OperationForm({
@@ -48,6 +49,13 @@ export function OperationForm({
   const [loading, setLoading] = useState(false);
   const isEdit = !!initialValues?.id;
   const today = toISODateString(new Date());
+
+  const getDefaultIsConfirmed = () => {
+    const opDate = initialValues?.operationDate;
+    if (!opDate) return true;
+    const tomorrow = toISODateString(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    return opDate < tomorrow;
+  };
 
   const form = useForm<FormValues>({
     initialValues: {
@@ -68,6 +76,7 @@ export function OperationForm({
       startDate: initialValues?.recurrenceRule?.startDate ?? today,
       endDate: initialValues?.recurrenceRule?.endDate ?? '',
       noEndDate: !initialValues?.recurrenceRule?.endDate,
+      isConfirmed: initialValues?.isConfirmed ?? getDefaultIsConfirmed(),
     },
     validate: {
       amount: (v) => (!v || v <= 0) ? 'Введите сумму больше 0' : null,
@@ -101,6 +110,7 @@ export function OperationForm({
           startDate: values.startDate,
           endDate: values.noEndDate ? undefined : (values.endDate || undefined),
         } : undefined,
+        isConfirmed: isEdit ? undefined : values.isConfirmed,
       };
 
       let result: PlannedOperation;
@@ -237,6 +247,15 @@ export function OperationForm({
             size="sm"
             {...form.getInputProps('isRecurring', { type: 'checkbox' })}
           />
+
+          {!isEdit && (
+            <Switch
+              label="Сразу подтвердить"
+              description="Обновить баланс счёта"
+              size="sm"
+              {...form.getInputProps('isConfirmed', { type: 'checkbox' })}
+            />
+          )}
 
           {!form.values.isRecurring && (
             <TextInput

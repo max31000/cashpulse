@@ -84,6 +84,7 @@ export default function AccountDetail() {
     try {
       await deleteOperation(opId);
       useOperationStore.getState().removeOperation(opId);
+      void fetchAccounts();
       notifications.show({ title: 'Удалено', message: 'Операция удалена', color: 'green' });
     } catch (e) {
       notifications.show({ title: 'Ошибка', message: (e as Error).message, color: 'red' });

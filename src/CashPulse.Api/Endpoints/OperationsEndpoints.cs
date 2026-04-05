@@ -92,6 +92,9 @@ public static class OperationsEndpoints
             recurrenceRuleId = await repo.CreateRecurrenceRuleAsync(rule);
         }
 
+        var shouldConfirm = req.IsConfirmed ??
+            (req.OperationDate == null || req.OperationDate <= DateOnly.FromDateTime(DateTime.Today));
+
         var op = new PlannedOperation
         {
             UserId = userId,
@@ -103,11 +106,29 @@ public static class OperationsEndpoints
             Description = req.Description?.Trim(),
             OperationDate = req.OperationDate,
             RecurrenceRuleId = recurrenceRuleId,
-            IsConfirmed = false,
+            IsConfirmed = shouldConfirm,
             ScenarioId = req.ScenarioId.HasValue ? (ulong)req.ScenarioId.Value : null
         };
 
         var id = await repo.CreateAsync(op);
+
+        if (shouldConfirm)
+        {
+            var balances = (await accountRepo.GetBalancesAsync((ulong)req.AccountId)).ToList();
+            var entry = balances.FirstOrDefault(b =>
+                string.Equals(b.Currency, req.Currency.ToUpper(), StringComparison.OrdinalIgnoreCase));
+            if (entry != null)
+                entry.Amount += req.Amount;
+            else
+                balances.Add(new CurrencyBalance
+                {
+                    AccountId = (ulong)req.AccountId,
+                    Currency = req.Currency.ToUpper(),
+                    Amount = req.Amount
+                });
+            await accountRepo.UpdateBalancesAsync((ulong)req.AccountId, balances);
+        }
+
         var created = await repo.GetByIdAsync(id, userId);
         return Results.Created($"/api/operations/{id}", created);
     }
@@ -134,11 +155,28 @@ public static class OperationsEndpoints
         return Results.Ok(existing);
     }
 
-    private static async Task<IResult> DeleteOperation(long id, HttpContext ctx, IOperationRepository repo)
+    private static async Task<IResult> DeleteOperation(
+        long id,
+        HttpContext ctx,
+        IOperationRepository repo,
+        IAccountRepository accountRepo)
     {
         var userId = GetUserId(ctx);
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Operation {id} not found");
+
+        if (existing.IsConfirmed)
+        {
+            var balances = (await accountRepo.GetBalancesAsync(existing.AccountId)).ToList();
+            var entry = balances.FirstOrDefault(b =>
+                string.Equals(b.Currency, existing.Currency, StringComparison.OrdinalIgnoreCase));
+            if (entry != null)
+            {
+                entry.Amount -= existing.Amount;
+                await accountRepo.UpdateBalancesAsync(existing.AccountId, balances);
+            }
+        }
+
         await repo.DeleteAsync((ulong)id, userId);
         return Results.NoContent();
     }
@@ -206,7 +244,8 @@ public record OperationCreateRequest(
     string? Description,
     DateOnly? OperationDate,
     RecurrenceRuleRequest? RecurrenceRule,
-    long? ScenarioId);
+    long? ScenarioId,
+    bool? IsConfirmed);
 
 public record OperationUpdateRequest(
     decimal? Amount,

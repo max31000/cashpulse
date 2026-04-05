@@ -161,6 +161,7 @@ export interface CreateOperationDto {
   operationDate?: string;
   recurrenceRule?: Omit<RecurrenceRule, 'id'>;
   scenarioId?: number;
+  isConfirmed?: boolean;
 }
 
 export interface CreateAccountDto {
