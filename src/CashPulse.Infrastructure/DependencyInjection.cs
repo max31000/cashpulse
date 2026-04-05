@@ -21,24 +21,29 @@ public static class DependencyInjection
         // Регистрируем TypeHandler'ы Dapper один раз при старте
         DapperTypeHandlers.Register();
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("DefaultConnection string is not configured");
+        // Вспомогательная функция — читает connectionString лениво при первом resolve,
+        // чтобы WebApplicationFactory.ConfigureWebHost успела подменить конфигурацию
+        // до того как репозитории впервые создадутся.
+        static string GetConnStr(IServiceProvider sp) =>
+            sp.GetRequiredService<IConfiguration>()
+              .GetConnectionString("DefaultConnection")
+              ?? throw new InvalidOperationException("DefaultConnection string is not configured");
 
         // Repositories
-        services.AddScoped<IUserRepository>(_ => new UserRepository(connectionString));
-        services.AddScoped<IAccountRepository>(_ => new AccountRepository(connectionString));
-        services.AddScoped<IOperationRepository>(_ => new OperationRepository(connectionString));
-        services.AddScoped<ICategoryRepository>(_ => new CategoryRepository(connectionString));
-        services.AddScoped<IScenarioRepository>(_ => new ScenarioRepository(connectionString));
-        services.AddScoped<IExchangeRateRepository>(_ => new ExchangeRateRepository(connectionString));
-        services.AddScoped<IBalanceSnapshotRepository>(_ => new BalanceSnapshotRepository(connectionString));
-        services.AddScoped<ICsvImportRepository>(_ => new CsvImportRepository(connectionString));
+        services.AddScoped<IUserRepository>(sp => new UserRepository(GetConnStr(sp)));
+        services.AddScoped<IAccountRepository>(sp => new AccountRepository(GetConnStr(sp)));
+        services.AddScoped<IOperationRepository>(sp => new OperationRepository(GetConnStr(sp)));
+        services.AddScoped<ICategoryRepository>(sp => new CategoryRepository(GetConnStr(sp)));
+        services.AddScoped<IScenarioRepository>(sp => new ScenarioRepository(GetConnStr(sp)));
+        services.AddScoped<IExchangeRateRepository>(sp => new ExchangeRateRepository(GetConnStr(sp)));
+        services.AddScoped<IBalanceSnapshotRepository>(sp => new BalanceSnapshotRepository(GetConnStr(sp)));
+        services.AddScoped<ICsvImportRepository>(sp => new CsvImportRepository(GetConnStr(sp)));
 
-        // Auth services (IConfiguration резолвится из DI контейнера — он зарегистрирован как singleton)
+        // Auth services
         services.AddScoped<ITelegramAuthService, TelegramAuthService>();
 
         // Income sources
-        services.AddScoped<IIncomeSourceRepository>(_ => new IncomeSourceRepository(connectionString));
+        services.AddScoped<IIncomeSourceRepository>(sp => new IncomeSourceRepository(GetConnStr(sp)));
         services.AddTransient<IncomeSourceExpander>();
 
         // Domain services
@@ -50,25 +55,25 @@ public static class DependencyInjection
             sp.GetRequiredService<IScenarioRepository>(),
             sp.GetRequiredService<IExchangeRateRepository>(),
             sp.GetRequiredService<ForecastEngine>(),
-            connectionString));
+            GetConnStr(sp)));
 
         services.AddScoped<IExchangeRateService>(sp => new ExchangeRateService(
-            connectionString,
+            GetConnStr(sp),
             sp.GetRequiredService<IExchangeRateRepository>(),
             sp.GetRequiredService<ILogger<ExchangeRateService>>(),
-            configuration["ExchangeRates:CbrXmlUrl"] ?? "https://www.cbr.ru/scripts/XML_daily.asp"));
+            sp.GetRequiredService<IConfiguration>()["ExchangeRates:CbrXmlUrl"]
+                ?? "https://www.cbr.ru/scripts/XML_daily.asp"));
 
         // Background service for exchange rates
-        var refreshIntervalHours = int.Parse(configuration["ExchangeRates:RefreshIntervalHours"] ?? "12");
         services.AddSingleton<ExchangeRateRefreshService>(sp => new ExchangeRateRefreshService(
             sp.GetRequiredService<IServiceScopeFactory>(),
             sp.GetRequiredService<ILogger<ExchangeRateRefreshService>>(),
-            refreshIntervalHours));
+            int.Parse(sp.GetRequiredService<IConfiguration>()["ExchangeRates:RefreshIntervalHours"] ?? "12")));
         services.AddHostedService(sp => sp.GetRequiredService<ExchangeRateRefreshService>());
 
         // Migration runner
         services.AddSingleton(sp => new MigrationRunner(
-            connectionString,
+            GetConnStr(sp),
             sp.GetRequiredService<ILogger<MigrationRunner>>()));
 
         return services;
