@@ -7,6 +7,7 @@ on:
     paths:
       - 'cashpulse-web/**'
       - '.github/workflows/frontend.yml'
+  workflow_dispatch:
 
 concurrency:
   group: frontend-${{ github.ref }}
@@ -15,10 +16,6 @@ concurrency:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
-    # NOTE: когда репозиторий станет публичным — раскомментировать блок ниже
-    # и удалить шаг "Deploy to VDS via SCP"
-    # permissions:
-    #   contents: write  # required for gh-pages branch
 
     steps:
       - name: Checkout
@@ -41,12 +38,9 @@ jobs:
         run: yarn build
         working-directory: cashpulse-web
         env:
-          # API на том же домене через nginx /api/ proxy
-          VITE_API_URL: "https://mvv42.ru"
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
           VITE_TELEGRAM_BOT_USERNAME: mv_cashpulse_bot
 
-      # Деплой на VDS через SCP (пока репозиторий приватный)
-      # Когда репозиторий станет публичным — заменить на GitHub Pages (см. комментарий ниже)
       - name: Deploy to VDS via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -57,11 +51,3 @@ jobs:
           target: /var/www/cashpulse/
           strip_components: 2
           rm: true
-
-      # FUTURE: GitHub Pages (раскомментировать когда репо станет публичным)
-      # - name: Deploy to GitHub Pages
-      #   uses: JamesIves/github-pages-deploy-action@v4
-      #   with:
-      #     folder: cashpulse-web/dist
-      #     branch: gh-pages
-      #     clean: true
