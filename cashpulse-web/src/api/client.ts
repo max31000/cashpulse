@@ -1,6 +1,6 @@
 import { useAuthStore } from '../store/useAuthStore';
 
-// В проде VITE_API_URL пустая строка — API на том же домене через nginx /api/
+// В проде VITE_API_URL = https://mvv42.ru:8443 (nginx HTTPS → прокси на :5000)
 // В dev — http://localhost:5000
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
