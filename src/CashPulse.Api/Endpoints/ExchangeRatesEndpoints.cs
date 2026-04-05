@@ -12,7 +12,6 @@ public static class ExchangeRatesEndpoints
 
         group.MapGet("/", GetRates);
         group.MapPost("/refresh", RefreshRates);
-        group.MapPut("/", UpdateRate);
     }
 
     private static async Task<IResult> GetRates(IExchangeRateRepository repo)
@@ -27,32 +26,4 @@ public static class ExchangeRatesEndpoints
         var rates = await service.GetAllRatesAsync();
         return Results.Ok(new { message = "Exchange rates refreshed", rates });
     }
-
-    private static async Task<IResult> UpdateRate(ExchangeRateUpdateRequest req, IExchangeRateRepository repo)
-    {
-        if (req.Rate <= 0)
-            throw new CashPulse.Api.Middleware.ValidationException("Rate must be positive");
-
-        var rate = new ExchangeRate
-        {
-            FromCurrency = req.FromCurrency.ToUpper(),
-            ToCurrency = req.ToCurrency.ToUpper(),
-            Rate = req.Rate
-        };
-
-        await repo.UpsertAsync(rate);
-
-        // Update inverse rate
-        var inverseRate = new ExchangeRate
-        {
-            FromCurrency = req.ToCurrency.ToUpper(),
-            ToCurrency = req.FromCurrency.ToUpper(),
-            Rate = 1m / req.Rate
-        };
-        await repo.UpsertAsync(inverseRate);
-
-        return Results.Ok(rate);
-    }
 }
-
-public record ExchangeRateUpdateRequest(string FromCurrency, string ToCurrency, decimal Rate);

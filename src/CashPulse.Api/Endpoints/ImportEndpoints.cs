@@ -16,8 +16,10 @@ public static class ImportEndpoints
         group.MapPost("/csv", ImportCsv);
     }
 
-    private static async Task<IResult> PreviewCsv(HttpRequest request)
+    private static async Task<IResult> PreviewCsv(HttpRequest request, HttpContext ctx)
     {
+        var _userId = (ulong)ctx.Items["UserId"]!; // явная привязка к авторизованному пользователю
+
         if (!request.HasFormContentType)
             throw new ValidationException("Request must be multipart/form-data");
 
@@ -26,6 +28,9 @@ public static class ImportEndpoints
 
         if (file == null)
             throw new ValidationException("No file uploaded");
+
+        if (file.Length > 5 * 1024 * 1024)
+            throw new ValidationException("File size exceeds 5MB limit");
 
         using var reader = new StreamReader(file.OpenReadStream(), Encoding.UTF8);
         var lines = new List<string>();
@@ -58,7 +63,8 @@ public static class ImportEndpoints
         HttpContext ctx,
         IOperationRepository opRepo,
         ICategoryRepository catRepo,
-        ICsvImportRepository importRepo)
+        ICsvImportRepository importRepo,
+        IAccountRepository accountRepo)
     {
         var userId = (ulong)ctx.Items["UserId"]!;
 
@@ -70,6 +76,9 @@ public static class ImportEndpoints
 
         if (file == null)
             throw new ValidationException("No file uploaded");
+
+        if (file.Length > 5 * 1024 * 1024)
+            throw new ValidationException("File size exceeds 5MB limit");
 
         var columnMappingJson = form["columnMapping"].ToString();
         if (string.IsNullOrEmpty(columnMappingJson))
@@ -197,6 +206,9 @@ public static class ImportEndpoints
                 message = "accountId is required to complete import. Preview only."
             });
         }
+
+        var accountForImport = await accountRepo.GetByIdAsync(accountId, userId)
+            ?? throw new ValidationException("Account not found or access denied");
 
         foreach (var op in importedOps)
             op.AccountId = accountId;

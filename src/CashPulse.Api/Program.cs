@@ -43,7 +43,7 @@ app.UseCors();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<JwtMiddleware>();
 
-if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
