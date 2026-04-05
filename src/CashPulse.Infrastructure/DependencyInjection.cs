@@ -18,6 +18,9 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Регистрируем TypeHandler'ы Dapper один раз при старте
+        DapperTypeHandlers.Register();
+
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection string is not configured");
 
