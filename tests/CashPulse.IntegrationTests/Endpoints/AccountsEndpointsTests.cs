@@ -12,7 +12,7 @@ namespace CashPulse.IntegrationTests.Endpoints;
 /// Uses a shared TestWebApplicationFactory with a real MySQL 8.0 Testcontainer.
 /// </summary>
 [Collection("Integration")]
-public class AccountsEndpointsTests : IClassFixture<TestWebApplicationFactory>
+public class AccountsEndpointsTests
 {
     private readonly TestWebApplicationFactory _factory;
 
