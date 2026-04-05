@@ -30,6 +30,10 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Mark environment as Testing so Program.cs skips MigrationRunner
+        // (migrations are already applied by DatabaseFixture via TestContainers)
+        builder.UseEnvironment("Testing");
+
         builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>

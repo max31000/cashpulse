@@ -52,16 +52,19 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Run database migrations
-try
+// Run database migrations (skipped in Testing environment — handled by DatabaseFixture)
+if (!app.Environment.IsEnvironment("Testing"))
 {
-    var migrationRunner = app.Services.GetRequiredService<MigrationRunner>();
-    await migrationRunner.RunAsync();
-}
-catch (Exception ex)
-{
-    app.Logger.LogError(ex, "Failed to run database migrations");
-    throw;
+    try
+    {
+        var migrationRunner = app.Services.GetRequiredService<MigrationRunner>();
+        await migrationRunner.RunAsync();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Failed to run database migrations");
+        throw;
+    }
 }
 
 // Map API endpoints
