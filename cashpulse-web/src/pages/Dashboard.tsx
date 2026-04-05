@@ -56,6 +56,7 @@ export default function Dashboard() {
     try {
       await confirmOperation(id);
       void fetchOps();
+      void fetchAccounts();
       notifications.show({ title: 'Подтверждено', message: 'Операция подтверждена', color: 'green' });
     } catch (e) {
       notifications.show({ title: 'Ошибка', message: (e as Error).message, color: 'red' });

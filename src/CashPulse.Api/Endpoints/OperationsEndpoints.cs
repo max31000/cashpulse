@@ -68,9 +68,13 @@ public static class OperationsEndpoints
     private static async Task<IResult> CreateOperation(
         OperationCreateRequest req,
         HttpContext ctx,
-        IOperationRepository repo)
+        IOperationRepository repo,
+        IAccountRepository accountRepo)
     {
         var userId = GetUserId(ctx);
+
+        var account = await accountRepo.GetByIdAsync((ulong)req.AccountId, userId)
+            ?? throw new NotFoundException($"Account {req.AccountId} not found");
 
         if (req.Amount == 0)
             throw new ValidationException("Amount cannot be zero");
@@ -139,12 +143,41 @@ public static class OperationsEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> ConfirmOperation(long id, HttpContext ctx, IOperationRepository repo)
+    private static async Task<IResult> ConfirmOperation(
+        long id,
+        HttpContext ctx,
+        IOperationRepository repo,
+        IAccountRepository accountRepo)
     {
         var userId = GetUserId(ctx);
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Operation {id} not found");
+
+        if (existing.IsConfirmed)
+            return Results.Ok(new { id, isConfirmed = true });
+
         await repo.ConfirmAsync((ulong)id, userId);
+
+        var balances = (await accountRepo.GetBalancesAsync(existing.AccountId)).ToList();
+        var entry = balances.FirstOrDefault(b =>
+            string.Equals(b.Currency, existing.Currency, StringComparison.OrdinalIgnoreCase));
+
+        if (entry != null)
+        {
+            entry.Amount += existing.Amount;
+        }
+        else
+        {
+            balances.Add(new CurrencyBalance
+            {
+                AccountId = existing.AccountId,
+                Currency = existing.Currency,
+                Amount = existing.Amount
+            });
+        }
+
+        await accountRepo.UpdateBalancesAsync(existing.AccountId, balances);
+
         return Results.Ok(new { id, isConfirmed = true });
     }
 

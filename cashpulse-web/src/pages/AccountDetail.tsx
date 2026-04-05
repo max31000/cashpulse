@@ -35,7 +35,7 @@ export default function AccountDetail() {
   const account = accounts.find((a) => a.id === Number(id));
 
   useEffect(() => {
-    if (accounts.length === 0) void fetchAccounts();
+    void fetchAccounts();
     void fetchCategories();
     void fetchScenarios();
   }, []);
@@ -72,6 +72,7 @@ export default function AccountDetail() {
       const store = useOperationStore.getState();
       const existing = store.operations.find((o) => o.id === opId);
       if (existing) store.updateOperation({ ...existing, isConfirmed: true });
+      void fetchAccounts();
       notifications.show({ title: 'Подтверждено', message: 'Операция подтверждена', color: 'green' });
     } catch (e) {
       notifications.show({ title: 'Ошибка', message: (e as Error).message, color: 'red' });
@@ -185,6 +186,7 @@ export default function AccountDetail() {
         onSave={(op) => {
           if (editingOp) useOperationStore.getState().updateOperation(op);
           else useOperationStore.getState().addOperation(op);
+          void fetchAccounts();
         }}
         accounts={accounts}
         categories={categories}
