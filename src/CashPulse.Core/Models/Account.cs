@@ -11,6 +11,20 @@ public class Account
     public decimal? MinPaymentPercent { get; set; }
     public int? StatementDay { get; set; }
     public int? DueDay { get; set; }
+
+    // Deposits (Type = Deposit) and savings investment accounts (InvestmentSubtype = "savings")
+    public decimal? InterestRate { get; set; }
+    public int? InterestAccrualDay { get; set; }
+    public DateOnly? DepositEndDate { get; set; }
+    public bool? CanTopUpAlways { get; set; }
+    public bool? CanWithdraw { get; set; }
+
+    // Investment accounts (Type = Investment)
+    public string? InvestmentSubtype { get; set; }
+
+    // Credit cards (Type = Credit)
+    public DateOnly? GracePeriodEndDate { get; set; }
+
     public bool IsArchived { get; set; }
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -25,5 +39,6 @@ public enum AccountType
     Debit,
     Credit,
     Investment,
-    Cash
+    Cash,
+    Deposit
 }

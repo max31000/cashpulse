@@ -127,16 +127,16 @@ export function OperationForm({
     }
   };
 
-  const activeAccounts = accounts.filter((a) => !a.isArchived);
+  const activeAccounts = (accounts ?? []).filter((a) => !a.isArchived);
   const accountData = activeAccounts.map((a) => ({ value: String(a.id), label: a.name }));
-  const categoryData = categories.map((c) => ({
+  const categoryData = (categories ?? []).map((c) => ({
     value: String(c.id),
     label: c.parentId ? `  └ ${c.name}` : c.name,
     group: c.parentId ? undefined : c.name,
   }));
   const scenarioData = [
     { value: '', label: 'Базовый план' },
-    ...scenarios.map((s) => ({ value: String(s.id), label: s.name })),
+    ...(scenarios ?? []).map((s) => ({ value: String(s.id), label: s.name })),
   ];
 
   return (

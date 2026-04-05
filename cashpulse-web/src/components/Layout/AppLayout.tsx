@@ -5,8 +5,9 @@ import { useAuthStore } from '../../store/useAuthStore';
 
 const navItems = [
   { label: 'Дашборд',   path: '/',          icon: '📊', end: true  },
-  { label: 'Операции',  path: '/operations', icon: '💰', end: false },
-  { label: 'Счета',     path: '/accounts',   icon: '🏦', end: false },
+  { label: 'Операции',  path: '/operations',     icon: '💰', end: false },
+  { label: 'Доходы',    path: '/income-sources', icon: '💵', end: false },
+  { label: 'Счета',     path: '/accounts',        icon: '🏦', end: false },
   { label: 'Сценарии',  path: '/scenarios',  icon: '🔮', end: false },
   { label: 'Теги',      path: '/tags',       icon: '🏷', end: false },
   { label: 'Настройки', path: '/settings',   icon: '⚙',  end: false },

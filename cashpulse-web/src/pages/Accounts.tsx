@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Stack, Group, Button, Text, Card, Badge, Progress, SimpleGrid,
-  Modal, TextInput, Select, NumberInput, Divider, ActionIcon, Skeleton
+  Modal, TextInput, Select, NumberInput, Divider, ActionIcon, Skeleton, Switch
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
@@ -23,6 +23,13 @@ interface FormValues {
   minPaymentPercent: number | '';
   statementDay: number | '';
   dueDay: number | '';
+  interestRate: number | '';
+  interestAccrualDay: number | '';
+  depositEndDate: string;
+  canTopUpAlways: boolean;
+  canWithdraw: boolean;
+  investmentSubtype: string;
+  gracePeriodEndDate: string;
 }
 
 function AccountModal({ opened, onClose, onSave, initial }: {
@@ -42,6 +49,13 @@ function AccountModal({ opened, onClose, onSave, initial }: {
       minPaymentPercent: initial?.minPaymentPercent ?? '',
       statementDay: initial?.statementDay ?? '',
       dueDay: initial?.dueDay ?? '',
+      interestRate: initial?.interestRate ?? '',
+      interestAccrualDay: initial?.interestAccrualDay ?? '',
+      depositEndDate: initial?.depositEndDate ?? '',
+      canTopUpAlways: initial?.canTopUpAlways ?? true,
+      canWithdraw: initial?.canWithdraw ?? false,
+      investmentSubtype: initial?.investmentSubtype ?? '',
+      gracePeriodEndDate: initial?.gracePeriodEndDate ?? '',
     },
     validate: {
       name: (v) => !v.trim() ? 'Введите название' : null,
@@ -61,6 +75,13 @@ function AccountModal({ opened, onClose, onSave, initial }: {
         minPaymentPercent: values.type === 'credit' && values.minPaymentPercent !== '' ? values.minPaymentPercent as number : undefined,
         statementDay: values.type === 'credit' && values.statementDay !== '' ? values.statementDay as number : undefined,
         dueDay: values.type === 'credit' && values.dueDay !== '' ? values.dueDay as number : undefined,
+        interestRate: values.interestRate !== '' ? values.interestRate as number : undefined,
+        interestAccrualDay: values.interestAccrualDay !== '' ? values.interestAccrualDay as number : undefined,
+        depositEndDate: values.depositEndDate || undefined,
+        canTopUpAlways: values.type === 'deposit' ? values.canTopUpAlways : undefined,
+        canWithdraw: values.type === 'deposit' ? values.canWithdraw : undefined,
+        investmentSubtype: values.type === 'investment' ? values.investmentSubtype || undefined : undefined,
+        gracePeriodEndDate: values.type === 'credit' ? values.gracePeriodEndDate || undefined : undefined,
       };
       const result = initial ? await updateAccount(initial.id, dto) : await createAccount(dto);
       onSave(result);
@@ -86,6 +107,7 @@ function AccountModal({ opened, onClose, onSave, initial }: {
             { value: 'credit', label: 'Кредитный' },
             { value: 'investment', label: 'Инвестиционный' },
             { value: 'cash', label: 'Наличные' },
+            { value: 'deposit', label: 'Вклад' },
           ]} {...form.getInputProps('type')} />
 
           <Text fz="sm" fw={500}>Начальные балансы</Text>
@@ -109,9 +131,96 @@ function AccountModal({ opened, onClose, onSave, initial }: {
               </Group>
               <Group grow>
                 <NumberInput label="Минимальный платёж (%)" min={0} max={100} decimalScale={2} suffix="%" {...form.getInputProps('minPaymentPercent')} />
-                <NumberInput label="День формирования выписки" min={1} max={31} description="31 — последний день" {...form.getInputProps('statementDay')} />
+                <NumberInput label="День оплаты" min={1} max={31} {...form.getInputProps('dueDay')} />
               </Group>
-              <NumberInput label="День оплаты" min={1} max={31} w={200} {...form.getInputProps('dueDay')} />
+              <TextInput
+                label="Дата окончания беспроцентного периода"
+                description="Введите конкретную дату — например для Альфа 100 дней с первой операции"
+                type="date"
+                {...form.getInputProps('gracePeriodEndDate')}
+              />
+            </>
+          )}
+
+          {form.values.type === 'deposit' && (
+            <>
+              <Divider label="Параметры вклада" labelPosition="left" my="xs" />
+              <Group grow>
+                <NumberInput
+                  label="Годовая ставка"
+                  description="Например: 16.5 для 16.5% годовых"
+                  required
+                  min={0.01}
+                  max={100}
+                  decimalScale={2}
+                  suffix="%"
+                  {...form.getInputProps('interestRate')}
+                />
+                <NumberInput
+                  label="День начисления процентов"
+                  description="Число месяца (1-28)"
+                  required
+                  min={1}
+                  max={28}
+                  {...form.getInputProps('interestAccrualDay')}
+                />
+              </Group>
+              <TextInput
+                label="Дата окончания вклада"
+                description="Оставьте пустым для бессрочного вклада"
+                type="date"
+                {...form.getInputProps('depositEndDate')}
+              />
+              <Group>
+                <Switch
+                  label="Пополнение в любое время"
+                  description="Если выключено — только первые 30 дней с открытия"
+                  {...form.getInputProps('canTopUpAlways', { type: 'checkbox' })}
+                />
+                <Switch
+                  label="Частичное снятие разрешено"
+                  description="Если выключено — снятие только при закрытии"
+                  {...form.getInputProps('canWithdraw', { type: 'checkbox' })}
+                />
+              </Group>
+            </>
+          )}
+
+          {form.values.type === 'investment' && (
+            <>
+              <Divider label="Тип инвестиционного счёта" labelPosition="left" my="xs" />
+              <Select
+                label="Вид счёта"
+                required
+                data={[
+                  { value: 'savings', label: 'Сберегательный (фиксированная ставка)' },
+                  { value: 'bonds', label: 'Облигации (купоны — вручную)' },
+                  { value: 'stocks', label: 'Акции / фонды (вручную)' },
+                ]}
+                {...form.getInputProps('investmentSubtype')}
+              />
+              {form.values.investmentSubtype === 'savings' && (
+                <Group grow>
+                  <NumberInput
+                    label="Годовая ставка"
+                    description="Например: 12.5 для 12.5% годовых"
+                    required
+                    min={0.01}
+                    max={100}
+                    decimalScale={2}
+                    suffix="%"
+                    {...form.getInputProps('interestRate')}
+                  />
+                  <NumberInput
+                    label="День начисления процентов"
+                    description="Число месяца (1-28)"
+                    required
+                    min={1}
+                    max={28}
+                    {...form.getInputProps('interestAccrualDay')}
+                  />
+                </Group>
+              )}
             </>
           )}
 
@@ -191,6 +300,35 @@ export default function Accounts() {
             {dueDay && <Text fz="xs" c={daysLeft <= 7 ? 'red' : 'dimmed'} mt={4}>До оплаты: {daysLeft} дней</Text>}
             {acc.minPaymentPercent && <Text fz="xs" c="dimmed">Мин. платёж: {acc.minPaymentPercent}%</Text>}
           </>
+        )}
+
+        {acc.type === 'credit' && acc.gracePeriodEndDate && (
+          (() => {
+            const graceLeft = Math.round(
+              (new Date(acc.gracePeriodEndDate).getTime() - Date.now()) / 86400000
+            );
+            return (
+              <Text size="sm" c={graceLeft <= 7 ? 'red' : graceLeft <= 14 ? 'yellow' : 'dimmed'}>
+                Беспроцентный период: {graceLeft > 0 ? `ещё ${graceLeft} дн.` : 'истёк'}
+              </Text>
+            );
+          })()
+        )}
+
+        {acc.type === 'deposit' && acc.interestRate && (
+          <Text size="sm" c="dimmed">
+            {acc.interestRate}% годовых
+            {acc.depositEndDate && ` · до ${new Date(acc.depositEndDate).toLocaleDateString('ru-RU')}`}
+            {acc.interestAccrualDay && ` · начисление ${acc.interestAccrualDay}-го`}
+          </Text>
+        )}
+
+        {acc.type === 'investment' && acc.investmentSubtype && (
+          <Text size="sm" c="dimmed">
+            {acc.investmentSubtype === 'savings' ? 'Сберегательный' :
+             acc.investmentSubtype === 'bonds' ? 'Облигации' : 'Акции / фонды'}
+            {acc.investmentSubtype === 'savings' && acc.interestRate && ` · ${acc.interestRate}%`}
+          </Text>
         )}
 
         <Card.Section withBorder inheritPadding pt="sm" mt="md">

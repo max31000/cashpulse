@@ -26,6 +26,7 @@ export const accountTypeColors: Record<string, string> = {
   credit: 'orange',
   investment: 'green',
   cash: 'gray',
+  deposit: 'teal',
 };
 
 export const accountTypeLabels: Record<string, string> = {
@@ -33,4 +34,5 @@ export const accountTypeLabels: Record<string, string> = {
   credit: 'Кредитный',
   investment: 'Инвестиционный',
   cash: 'Наличные',
+  deposit: 'Вклад',
 };

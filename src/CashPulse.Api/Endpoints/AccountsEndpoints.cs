@@ -51,7 +51,14 @@ public static class AccountsEndpoints
             StatementDay = req.StatementDay,
             DueDay = req.DueDay,
             IsArchived = false,
-            SortOrder = req.SortOrder
+            SortOrder = req.SortOrder,
+            InterestRate = req.InterestRate,
+            InterestAccrualDay = req.InterestAccrualDay,
+            DepositEndDate = req.DepositEndDate,
+            CanTopUpAlways = req.CanTopUpAlways,
+            CanWithdraw = req.CanWithdraw,
+            InvestmentSubtype = req.InvestmentSubtype,
+            GracePeriodEndDate = req.GracePeriodEndDate
         };
 
         var id = await repo.CreateAsync(account);
@@ -85,6 +92,13 @@ public static class AccountsEndpoints
         existing.StatementDay = req.StatementDay ?? existing.StatementDay;
         existing.DueDay = req.DueDay ?? existing.DueDay;
         existing.SortOrder = req.SortOrder ?? existing.SortOrder;
+        existing.InterestRate = req.InterestRate ?? existing.InterestRate;
+        existing.InterestAccrualDay = req.InterestAccrualDay ?? existing.InterestAccrualDay;
+        existing.DepositEndDate = req.DepositEndDate ?? existing.DepositEndDate;
+        existing.CanTopUpAlways = req.CanTopUpAlways ?? existing.CanTopUpAlways;
+        existing.CanWithdraw = req.CanWithdraw ?? existing.CanWithdraw;
+        existing.InvestmentSubtype = req.InvestmentSubtype ?? existing.InvestmentSubtype;
+        existing.GracePeriodEndDate = req.GracePeriodEndDate ?? existing.GracePeriodEndDate;
 
         await repo.UpdateAsync(existing);
         return Results.Ok(existing);
@@ -128,7 +142,14 @@ public record AccountCreateRequest(
     int? StatementDay,
     int? DueDay,
     int SortOrder = 0,
-    List<BalanceUpdateItem>? Balances = null);
+    List<BalanceUpdateItem>? Balances = null,
+    decimal? InterestRate = null,
+    int? InterestAccrualDay = null,
+    DateOnly? DepositEndDate = null,
+    bool? CanTopUpAlways = null,
+    bool? CanWithdraw = null,
+    string? InvestmentSubtype = null,
+    DateOnly? GracePeriodEndDate = null);
 
 public record AccountUpdateRequest(
     string? Name,
@@ -138,6 +159,13 @@ public record AccountUpdateRequest(
     decimal? MinPaymentPercent,
     int? StatementDay,
     int? DueDay,
-    int? SortOrder);
+    int? SortOrder,
+    decimal? InterestRate = null,
+    int? InterestAccrualDay = null,
+    DateOnly? DepositEndDate = null,
+    bool? CanTopUpAlways = null,
+    bool? CanWithdraw = null,
+    string? InvestmentSubtype = null,
+    DateOnly? GracePeriodEndDate = null);
 
 public record BalanceUpdateItem(string Currency, decimal Amount);

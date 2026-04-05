@@ -13,6 +13,7 @@ import ScenarioDetail from './pages/ScenarioDetail';
 import Tags from './pages/Tags';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
+import IncomeSources from './pages/IncomeSources';
 import { useSettingsStore } from './store/useSettingsStore';
 
 import '@mantine/core/styles.css';
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="scenarios" element={<Scenarios />} />
               <Route path="scenarios/:id" element={<ScenarioDetail />} />
               <Route path="tags" element={<Tags />} />
+              <Route path="income-sources" element={<IncomeSources />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>

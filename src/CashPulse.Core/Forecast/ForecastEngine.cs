@@ -1,4 +1,5 @@
 using CashPulse.Core.Models;
+using CashPulse.Core.Services;
 
 namespace CashPulse.Core.Forecast;
 
@@ -8,6 +9,27 @@ public class ForecastEngine
     {
         // Step 1: Expand all recurrences + collect one-time ops
         var allProjectedOperations = ExpandAllOperations(request);
+
+        // Step 1b: Inject interest accruals for deposits and savings investment accounts
+        var accrualService = new DepositAccrualService();
+        foreach (var (accountId, account) in request.Accounts)
+        {
+            bool isDepositOrSavings = account.Type == AccountType.Deposit ||
+                (account.Type == AccountType.Investment &&
+                 account.InvestmentSubtype?.Equals("savings", StringComparison.OrdinalIgnoreCase) == true);
+
+            if (!isDepositOrSavings || account.InterestRate == null) continue;
+
+            if (!request.CurrentBalances.TryGetValue(accountId, out var balances)) continue;
+
+            foreach (var (currency, balance) in balances)
+            {
+                if (balance <= 0) continue;
+                var accruals = accrualService.GenerateAccruals(
+                    account, balance, currency, request.HorizonStart, request.HorizonEnd);
+                allProjectedOperations.AddRange(accruals);
+            }
+        }
 
         // Step 2: Build account timelines
         var accountTimelines = BuildAccountTimelines(request, allProjectedOperations);
@@ -179,8 +201,15 @@ public class ForecastEngine
 
                 if (lastPoint == null) continue;
 
-                var balance = lastPoint.Balance;
-                totalNetWorth += ConvertToBase(balance, timeline.Currency, request.BaseCurrency, request.ExchangeRates);
+                var balanceAtDate = lastPoint.Balance;
+
+                // Credit accounts contribute only the negative part (debt) to net worth
+                var account = request.Accounts.GetValueOrDefault(timeline.AccountId);
+                var effectiveBalance = account?.Type == AccountType.Credit
+                    ? Math.Min(balanceAtDate, 0m)
+                    : balanceAtDate;
+
+                totalNetWorth += ConvertToBase(effectiveBalance, timeline.Currency, request.BaseCurrency, request.ExchangeRates);
             }
 
             netWorthTimeline.Add(new NetWorthPoint
@@ -351,8 +380,13 @@ public class ForecastEngine
                 prevBalance = point.Balance;
             }
 
-            // CREDIT_GRACE_EXPIRY
-            if (account.Type == AccountType.Credit
+            // CREDIT_GRACE_EXPIRY — GracePeriodEndDate-based (new logic)
+            if (account.Type == AccountType.Credit && account.GracePeriodEndDate.HasValue)
+            {
+                GenerateCreditGraceExpiryAlerts(request, timeline, account, alerts);
+            }
+            // CREDIT_GRACE_EXPIRY — legacy StatementDay-based (kept for backwards compatibility)
+            else if (account.Type == AccountType.Credit
                 && account.StatementDay.HasValue
                 && account.GracePeriodDays.HasValue
                 && account.MinPaymentPercent.HasValue)
@@ -368,6 +402,61 @@ public class ForecastEngine
         GenerateCrossCurrencyAlerts(request, accountTimelines, netWorthTimeline, alerts);
 
         return alerts;
+    }
+
+    private static void GenerateCreditGraceExpiryAlerts(
+        ForecastRequest request,
+        AccountTimeline timeline,
+        Account account,
+        List<ForecastAlert> alerts)
+    {
+        var graceEnd = account.GracePeriodEndDate!.Value;
+        var today = request.HorizonStart;
+
+        var creditUsed = request.CurrentBalances.TryGetValue(timeline.AccountId, out var cb)
+            ? cb.Values.Where(b => b < 0).Sum(b => Math.Abs(b))
+            : 0m;
+
+        if (creditUsed <= 0) return;
+
+        var daysLeft = (graceEnd.ToDateTime(TimeOnly.MinValue) - today.ToDateTime(TimeOnly.MinValue)).Days;
+
+        if (daysLeft < 0)
+        {
+            alerts.Add(new ForecastAlert
+            {
+                Type = ForecastAlertType.CreditGraceExpiry,
+                Severity = AlertSeverity.Critical,
+                Date = today,
+                AccountId = timeline.AccountId,
+                Message = $"Беспроцентный период по '{account.Name}' истёк! Долг {creditUsed:N0} — срочно погасите.",
+                SuggestedAction = "Немедленно пополните счёт для погашения долга"
+            });
+        }
+        else if (daysLeft <= 3)
+        {
+            alerts.Add(new ForecastAlert
+            {
+                Type = ForecastAlertType.CreditGraceExpiry,
+                Severity = AlertSeverity.Critical,
+                Date = graceEnd,
+                AccountId = timeline.AccountId,
+                Message = $"До конца беспроцентного периода '{account.Name}' {daysLeft} дн. Долг {creditUsed:N0}",
+                SuggestedAction = "Погасите долг в ближайшие дни"
+            });
+        }
+        else if (daysLeft <= 14)
+        {
+            alerts.Add(new ForecastAlert
+            {
+                Type = ForecastAlertType.CreditGraceExpiry,
+                Severity = AlertSeverity.Warning,
+                Date = graceEnd,
+                AccountId = timeline.AccountId,
+                Message = $"До конца беспроцентного периода '{account.Name}' {daysLeft} дн. Долг {creditUsed:N0}",
+                SuggestedAction = "Запланируйте погашение долга"
+            });
+        }
     }
 
     private void GenerateCreditGraceAlerts(

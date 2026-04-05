@@ -23,7 +23,9 @@ public class AccountRepository : IAccountRepository
         using var conn = CreateConnection();
         const string sql = @"
             SELECT Id, UserId, Name, Type, CreditLimit, GracePeriodDays, MinPaymentPercent,
-                   StatementDay, DueDay, IsArchived, SortOrder, CreatedAt, UpdatedAt
+                   StatementDay, DueDay, IsArchived, SortOrder, CreatedAt, UpdatedAt,
+                   InterestRate, InterestAccrualDay, DepositEndDate, CanTopUpAlways,
+                   CanWithdraw, InvestmentSubtype, GracePeriodEndDate
             FROM Accounts
             WHERE UserId = @UserId AND IsArchived = 0
             ORDER BY SortOrder, Id";
@@ -45,7 +47,9 @@ public class AccountRepository : IAccountRepository
         using var conn = CreateConnection();
         const string sql = @"
             SELECT Id, UserId, Name, Type, CreditLimit, GracePeriodDays, MinPaymentPercent,
-                   StatementDay, DueDay, IsArchived, SortOrder, CreatedAt, UpdatedAt
+                   StatementDay, DueDay, IsArchived, SortOrder, CreatedAt, UpdatedAt,
+                   InterestRate, InterestAccrualDay, DepositEndDate, CanTopUpAlways,
+                   CanWithdraw, InvestmentSubtype, GracePeriodEndDate
             FROM Accounts
             WHERE Id = @Id AND UserId = @UserId";
 
@@ -62,9 +66,13 @@ public class AccountRepository : IAccountRepository
         using var conn = CreateConnection();
         const string sql = @"
             INSERT INTO Accounts (UserId, Name, Type, CreditLimit, GracePeriodDays, MinPaymentPercent,
-                                  StatementDay, DueDay, IsArchived, SortOrder)
+                                  StatementDay, DueDay, IsArchived, SortOrder,
+                                  InterestRate, InterestAccrualDay, DepositEndDate, CanTopUpAlways,
+                                  CanWithdraw, InvestmentSubtype, GracePeriodEndDate)
             VALUES (@UserId, @Name, @Type, @CreditLimit, @GracePeriodDays, @MinPaymentPercent,
-                    @StatementDay, @DueDay, @IsArchived, @SortOrder);
+                    @StatementDay, @DueDay, @IsArchived, @SortOrder,
+                    @InterestRate, @InterestAccrualDay, @DepositEndDate, @CanTopUpAlways,
+                    @CanWithdraw, @InvestmentSubtype, @GracePeriodEndDate);
             SELECT LAST_INSERT_ID();";
 
         return await conn.ExecuteScalarAsync<ulong>(sql, new
@@ -78,7 +86,14 @@ public class AccountRepository : IAccountRepository
             account.StatementDay,
             account.DueDay,
             account.IsArchived,
-            account.SortOrder
+            account.SortOrder,
+            account.InterestRate,
+            account.InterestAccrualDay,
+            account.DepositEndDate,
+            account.CanTopUpAlways,
+            account.CanWithdraw,
+            account.InvestmentSubtype,
+            account.GracePeriodEndDate
         });
     }
 
@@ -89,7 +104,11 @@ public class AccountRepository : IAccountRepository
             UPDATE Accounts
             SET Name = @Name, Type = @Type, CreditLimit = @CreditLimit,
                 GracePeriodDays = @GracePeriodDays, MinPaymentPercent = @MinPaymentPercent,
-                StatementDay = @StatementDay, DueDay = @DueDay, SortOrder = @SortOrder
+                StatementDay = @StatementDay, DueDay = @DueDay, SortOrder = @SortOrder,
+                InterestRate = @InterestRate, InterestAccrualDay = @InterestAccrualDay,
+                DepositEndDate = @DepositEndDate, CanTopUpAlways = @CanTopUpAlways,
+                CanWithdraw = @CanWithdraw, InvestmentSubtype = @InvestmentSubtype,
+                GracePeriodEndDate = @GracePeriodEndDate
             WHERE Id = @Id AND UserId = @UserId";
 
         await conn.ExecuteAsync(sql, new
@@ -102,6 +121,13 @@ public class AccountRepository : IAccountRepository
             account.StatementDay,
             account.DueDay,
             account.SortOrder,
+            account.InterestRate,
+            account.InterestAccrualDay,
+            account.DepositEndDate,
+            account.CanTopUpAlways,
+            account.CanWithdraw,
+            account.InvestmentSubtype,
+            account.GracePeriodEndDate,
             account.Id,
             account.UserId
         });
@@ -160,7 +186,14 @@ public class AccountRepository : IAccountRepository
             IsArchived = row.IsArchived,
             SortOrder = row.SortOrder,
             CreatedAt = row.CreatedAt,
-            UpdatedAt = row.UpdatedAt
+            UpdatedAt = row.UpdatedAt,
+            InterestRate = row.InterestRate,
+            InterestAccrualDay = row.InterestAccrualDay,
+            DepositEndDate = row.DepositEndDate,
+            CanTopUpAlways = row.CanTopUpAlways,
+            CanWithdraw = row.CanWithdraw,
+            InvestmentSubtype = row.InvestmentSubtype,
+            GracePeriodEndDate = row.GracePeriodEndDate
         };
     }
 
@@ -179,5 +212,12 @@ public class AccountRepository : IAccountRepository
         public int SortOrder { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+        public decimal? InterestRate { get; set; }
+        public int? InterestAccrualDay { get; set; }
+        public DateOnly? DepositEndDate { get; set; }
+        public bool? CanTopUpAlways { get; set; }
+        public bool? CanWithdraw { get; set; }
+        public string? InvestmentSubtype { get; set; }
+        public DateOnly? GracePeriodEndDate { get; set; }
     }
 }

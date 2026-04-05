@@ -15,12 +15,22 @@ export interface Account {
   id: number;
   userId: number;
   name: string;
-  type: 'debit' | 'credit' | 'investment' | 'cash';
+  type: 'debit' | 'credit' | 'investment' | 'cash' | 'deposit';
   creditLimit?: number;
   gracePeriodDays?: number;
   minPaymentPercent?: number;
   statementDay?: number;
   dueDay?: number;
+  // Deposits (type='deposit') and savings investment accounts (investmentSubtype='savings')
+  interestRate?: number;
+  interestAccrualDay?: number;
+  depositEndDate?: string;
+  canTopUpAlways?: boolean;
+  canWithdraw?: boolean;
+  // Investment accounts (type='investment')
+  investmentSubtype?: 'savings' | 'bonds' | 'stocks';
+  // Credit cards (type='credit')
+  gracePeriodEndDate?: string;
   isArchived: boolean;
   sortOrder: number;
   createdAt: string;
@@ -154,13 +164,20 @@ export interface CreateOperationDto {
 
 export interface CreateAccountDto {
   name: string;
-  type: 'debit' | 'credit' | 'investment' | 'cash';
+  type: 'debit' | 'credit' | 'investment' | 'cash' | 'deposit';
   balances: { currency: string; amount: number }[];
   creditLimit?: number;
   gracePeriodDays?: number;
   minPaymentPercent?: number;
   statementDay?: number;
   dueDay?: number;
+  interestRate?: number;
+  interestAccrualDay?: number;
+  depositEndDate?: string;
+  canTopUpAlways?: boolean;
+  canWithdraw?: boolean;
+  investmentSubtype?: string;
+  gracePeriodEndDate?: string;
 }
 
 export interface CreateScenarioDto {
