@@ -129,11 +129,33 @@ export function OperationForm({
 
   const activeAccounts = (accounts ?? []).filter((a) => !a.isArchived);
   const accountData = activeAccounts.map((a) => ({ value: String(a.id), label: a.name }));
-  const categoryData = (categories ?? []).map((c) => ({
-    value: String(c.id),
-    label: c.parentId ? `  └ ${c.name}` : c.name,
-    group: c.parentId ? undefined : c.name,
-  }));
+
+  // Mantine v7 Select: объекты с полем "group" интерпретируются как группы-контейнеры
+  // с обязательным полем "items". Нельзя передавать плоские элементы с "group" свойством.
+  // Строим правильную структуру: { group: string, items: { value, label }[] }
+  const categoryData = (() => {
+    const cats = categories ?? [];
+    const roots = cats.filter((c) => !c.parentId);
+    const childrenMap = cats
+      .filter((c) => !!c.parentId)
+      .reduce<Record<number, Category[]>>((acc, c) => {
+        const pid = c.parentId!;
+        if (!acc[pid]) acc[pid] = [];
+        acc[pid].push(c);
+        return acc;
+      }, {});
+
+    if (roots.length === 0) {
+      return cats.map((c) => ({ value: String(c.id), label: c.name }));
+    }
+
+    return roots.map((root) => ({
+      group: root.name,
+      items: (childrenMap[root.id] ?? [{ id: root.id, name: root.name } as Category])
+        .map((c) => ({ value: String(c.id), label: c.name })),
+    }));
+  })();
+
   const scenarioData = [
     { value: '', label: 'Базовый план' },
     ...(scenarios ?? []).map((s) => ({ value: String(s.id), label: s.name })),
