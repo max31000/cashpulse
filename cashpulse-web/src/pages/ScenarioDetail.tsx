@@ -163,6 +163,7 @@ export default function ScenarioDetail() {
       )}
 
       <OperationForm
+        key={editingOp?.id ?? 'new'}
         opened={formOpened}
         onClose={closeForm}
         onSave={(op) => {

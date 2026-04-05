@@ -298,6 +298,7 @@ export default function Operations() {
       )}
 
       <OperationForm
+        key={editingOp?.id ?? 'new'}
         opened={formOpened}
         onClose={closeForm}
         onSave={(op) => {

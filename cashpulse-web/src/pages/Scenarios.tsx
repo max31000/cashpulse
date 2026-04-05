@@ -143,6 +143,7 @@ export default function Scenarios() {
       )}
 
       <ScenarioModal
+        key={editing?.id ?? 'new'}
         opened={modalOpened}
         onClose={close}
         onSave={(s) => { if (editing) updateStore(s); else addScenario(s); }}

@@ -401,6 +401,7 @@ export default function Accounts() {
       )}
 
       <AccountModal
+        key={editingAcc?.id ?? 'new'}
         opened={modalOpened}
         onClose={close}
         onSave={(acc) => {

@@ -181,6 +181,7 @@ export default function IncomeSources() {
       )}
 
       <IncomeSourceFormModal
+        key={editingSource?.id ?? 'new'}
         opened={formOpened}
         onClose={closeForm}
         initial={editingSource}

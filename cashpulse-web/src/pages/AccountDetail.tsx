@@ -182,6 +182,7 @@ export default function AccountDetail() {
       )}
 
       <OperationForm
+        key={editingOp?.id ?? 'new'}
         opened={formOpened}
         onClose={closeForm}
         onSave={(op) => {
