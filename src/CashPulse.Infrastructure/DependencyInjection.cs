@@ -7,6 +7,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
+// Регистрация IConfiguration как scoped-зависимости для TelegramAuthService
+// (IConfiguration уже является singleton, но нам нужно резолвить его через DI)
+
 namespace CashPulse.Infrastructure;
 
 public static class DependencyInjection
@@ -19,6 +22,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("DefaultConnection string is not configured");
 
         // Repositories
+        services.AddScoped<IUserRepository>(_ => new UserRepository(connectionString));
         services.AddScoped<IAccountRepository>(_ => new AccountRepository(connectionString));
         services.AddScoped<IOperationRepository>(_ => new OperationRepository(connectionString));
         services.AddScoped<ICategoryRepository>(_ => new CategoryRepository(connectionString));
@@ -26,6 +30,9 @@ public static class DependencyInjection
         services.AddScoped<IExchangeRateRepository>(_ => new ExchangeRateRepository(connectionString));
         services.AddScoped<IBalanceSnapshotRepository>(_ => new BalanceSnapshotRepository(connectionString));
         services.AddScoped<ICsvImportRepository>(_ => new CsvImportRepository(connectionString));
+
+        // Auth services (IConfiguration резолвится из DI контейнера — он зарегистрирован как singleton)
+        services.AddScoped<ITelegramAuthService, TelegramAuthService>();
 
         // Domain services
         services.AddTransient<ForecastEngine>();

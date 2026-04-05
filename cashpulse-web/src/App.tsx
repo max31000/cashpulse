@@ -3,6 +3,7 @@ import { Notifications } from '@mantine/notifications';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { theme } from './theme';
 import { AppLayout } from './components/Layout/AppLayout';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Operations from './pages/Operations';
 import Accounts from './pages/Accounts';
@@ -11,6 +12,7 @@ import Scenarios from './pages/Scenarios';
 import ScenarioDetail from './pages/ScenarioDetail';
 import Tags from './pages/Tags';
 import Settings from './pages/Settings';
+import Login from './pages/Login';
 import { useSettingsStore } from './store/useSettingsStore';
 
 import '@mantine/core/styles.css';
@@ -37,16 +39,23 @@ export default function App() {
       <Notifications position="top-right" autoClose={5000} />
       <BrowserRouter basename="/cashpulse">
         <Routes>
-          <Route element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="operations" element={<Operations />} />
-            <Route path="accounts" element={<Accounts />} />
-            <Route path="accounts/:id" element={<AccountDetail />} />
-            <Route path="scenarios" element={<Scenarios />} />
-            <Route path="scenarios/:id" element={<ScenarioDetail />} />
-            <Route path="tags" element={<Tags />} />
-            <Route path="settings" element={<Settings />} />
+          {/* Публичный маршрут */}
+          <Route path="login" element={<Login />} />
+
+          {/* Защищённые маршруты */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="operations" element={<Operations />} />
+              <Route path="accounts" element={<Accounts />} />
+              <Route path="accounts/:id" element={<AccountDetail />} />
+              <Route path="scenarios" element={<Scenarios />} />
+              <Route path="scenarios/:id" element={<ScenarioDetail />} />
+              <Route path="tags" element={<Tags />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
           </Route>
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

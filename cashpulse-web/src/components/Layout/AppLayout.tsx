@@ -1,14 +1,15 @@
-import { AppShell, Burger, Group, ScrollArea, Text, NavLink, Stack, Divider } from '@mantine/core';
+import { AppShell, Burger, Group, ScrollArea, Text, NavLink, Stack, Divider, Avatar, Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { Outlet, useNavigate, useMatch } from 'react-router-dom';
+import { useAuthStore } from '../../store/useAuthStore';
 
 const navItems = [
-  { label: 'Дашборд', path: '/', icon: '📊', end: true },
-  { label: 'Операции', path: '/operations', icon: '💰', end: false },
-  { label: 'Счета', path: '/accounts', icon: '🏦', end: false },
-  { label: 'Сценарии', path: '/scenarios', icon: '🔮', end: false },
-  { label: 'Теги', path: '/tags', icon: '🏷', end: false },
-  { label: 'Настройки', path: '/settings', icon: '⚙', end: false },
+  { label: 'Дашборд',   path: '/',          icon: '📊', end: true  },
+  { label: 'Операции',  path: '/operations', icon: '💰', end: false },
+  { label: 'Счета',     path: '/accounts',   icon: '🏦', end: false },
+  { label: 'Сценарии',  path: '/scenarios',  icon: '🔮', end: false },
+  { label: 'Теги',      path: '/tags',       icon: '🏷', end: false },
+  { label: 'Настройки', path: '/settings',   icon: '⚙',  end: false },
 ];
 
 function NavItem({ label, path, icon, end }: { label: string; path: string; icon: string; end: boolean }) {
@@ -31,6 +32,16 @@ function NavItem({ label, path, icon, end }: { label: string; path: string; icon
 export function AppLayout() {
   const [opened, { toggle, close }] = useDisclosure();
   const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
+  const initials = user?.displayName
+    ? user.displayName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '?';
 
   return (
     <AppShell
@@ -44,11 +55,14 @@ export function AppLayout() {
           <Text fw={700} size="lg" c="blue" style={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
             CashPulse
           </Text>
-          <div style={{ width: 28 }} />
+          <Avatar size="sm" radius="xl" color="blue" style={{ cursor: 'pointer' }} onClick={toggle}>
+            {initials}
+          </Avatar>
         </Group>
       </AppShell.Header>
 
       <AppShell.Navbar p="md">
+        {/* Лого */}
         <AppShell.Section>
           <Group gap="xs" mb="md" style={{ cursor: 'pointer' }} onClick={() => { navigate('/'); close(); }}>
             <Text fz="xl">≋</Text>
@@ -57,6 +71,7 @@ export function AppLayout() {
           <Divider mb="sm" />
         </AppShell.Section>
 
+        {/* Навигация */}
         <AppShell.Section grow component={ScrollArea}>
           <Stack gap={4}>
             {navItems.map((item) => (
@@ -67,9 +82,24 @@ export function AppLayout() {
           </Stack>
         </AppShell.Section>
 
+        {/* Пользователь + выход */}
         <AppShell.Section>
           <Divider mb="sm" />
-          <Text fz="xs" c="dimmed" ta="center" py="sm">v0.1.0</Text>
+          <Group gap="sm" mb="xs" wrap="nowrap">
+            <Avatar size="sm" radius="xl" color="blue">{initials}</Avatar>
+            <Text fz="sm" fw={500} truncate="end" style={{ flex: 1 }}>
+              {user?.displayName ?? '—'}
+            </Text>
+          </Group>
+          <Button
+            variant="subtle"
+            color="red"
+            size="xs"
+            fullWidth
+            onClick={handleLogout}
+          >
+            Выйти
+          </Button>
         </AppShell.Section>
       </AppShell.Navbar>
 

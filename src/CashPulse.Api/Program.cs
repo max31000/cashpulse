@@ -40,8 +40,8 @@ var app = builder.Build();
 
 // Middleware pipeline
 app.UseCors();
-app.UseMiddleware<DevUserMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
+app.UseMiddleware<JwtMiddleware>();
 
 if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
@@ -65,6 +65,7 @@ catch (Exception ex)
 }
 
 // Map API endpoints
+app.MapAuthEndpoints();
 app.MapAccountsEndpoints();
 app.MapOperationsEndpoints();
 app.MapCategoriesEndpoints();

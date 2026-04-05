@@ -42,6 +42,7 @@ jobs:
         working-directory: cashpulse-web
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_TELEGRAM_BOT_USERNAME: mv_cashpulse_bot
 
       # Деплой на VDS через SCP (пока репозиторий приватный)
       # Когда репозиторий станет публичным — заменить на GitHub Pages (см. комментарий ниже)
