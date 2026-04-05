@@ -80,3 +80,6 @@ app.MapBalanceSnapshotsEndpoints();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 app.Run();
+
+// Needed for WebApplicationFactory<Program> in integration tests
+public partial class Program { };
