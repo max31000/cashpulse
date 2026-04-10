@@ -25,6 +25,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: cashpulse-web/yarn.lock
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -43,10 +45,10 @@ jobs:
         working-directory: cashpulse-web
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-          VITE_TELEGRAM_BOT_USERNAME: mv_cashpulse_bot
+          VITE_TELEGRAM_BOT_USERNAME: ${{ vars.TELEGRAM_BOT_USERNAME }}
 
       - name: Deploy to VDS via SCP
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.VDS_HOST }}
           username: ${{ secrets.VDS_USER }}
@@ -55,3 +57,19 @@ jobs:
           target: /var/www/cashpulse/
           strip_components: 2
           rm: true
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VDS_HOST }}
+          username: ${{ secrets.VDS_USER }}
+          key: ${{ secrets.VDS_SSH_KEY }}
+          script: |
+            curl -sf https://mvv42.ru/cashpulse/ > /dev/null
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="❌ CashPulse Frontend deploy failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

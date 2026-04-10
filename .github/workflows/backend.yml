@@ -14,6 +14,10 @@ concurrency:
   group: backend-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-test-deploy:
     runs-on: ubuntu-latest
@@ -49,26 +53,34 @@ jobs:
         env:
           DOTNET_ENVIRONMENT: Testing
 
-      - name: Publish
-        run: dotnet publish src/CashPulse.Api/CashPulse.Api.csproj -c Release -o ./publish --no-restore
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        run: docker build -t cashpulse-api:latest -f src/CashPulse.Api/Dockerfile .
-
-      - name: Save Docker image
-        run: docker save cashpulse-api:latest | gzip > cashpulse-api.tar.gz
-
-      - name: Copy image to VDS
-        uses: appleboy/scp-action@v0.1.7
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.VDS_HOST }}
-          username: ${{ secrets.VDS_USER }}
-          key: ${{ secrets.VDS_SSH_KEY }}
-          source: cashpulse-api.tar.gz
-          target: /opt/cashpulse/
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: .
+          file: src/CashPulse.Api/Dockerfile
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/cashpulse-api:latest
+            ghcr.io/${{ github.repository_owner }}/cashpulse-api:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy on VDS
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         with:
           host: ${{ secrets.VDS_HOST }}
           username: ${{ secrets.VDS_USER }}
@@ -76,33 +88,24 @@ jobs:
           envs: DB_CONNECTION_STRING,JWT_SECRET,TELEGRAM_BOT_TOKEN
           script: |
             set -e
-            cd /opt/cashpulse
-
-            echo "=== Loading Docker image ==="
-            docker load < cashpulse-api.tar.gz
-
-            echo "=== Stopping old container (if exists) ==="
-            docker stop cashpulse-api || true
-            docker rm cashpulse-api || true
-
-            echo "=== Starting new container ==="
+            docker pull ghcr.io/${{ github.repository_owner }}/cashpulse-api:latest
+            docker stop cashpulse-api && docker rm cashpulse-api || true
             docker run -d \
               --name cashpulse-api \
               --network cashpulse-network \
               --restart unless-stopped \
-              -p 5000:5000 \
-              -e ASPNETCORE_ENVIRONMENT=Production \
-              -e ASPNETCORE_URLS=http://+:5000 \
+              -p 127.0.0.1:5000:5000 \
               -e "ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}" \
-              -e "Jwt__Secret=${JWT_SECRET}" \
-              -e "Telegram__BotToken=${TELEGRAM_BOT_TOKEN}" \
-              cashpulse-api:latest
+              -e "JwtSettings__Secret=${JWT_SECRET}" \
+              -e "TelegramSettings__BotToken=${TELEGRAM_BOT_TOKEN}" \
+              ghcr.io/${{ github.repository_owner }}/cashpulse-api:latest
+            sleep 3
+            curl -sf http://localhost:5000/health || (echo "Health check failed!" && exit 1)
+            docker image prune -f
 
-            echo "=== Waiting for API to start ==="
-            sleep 5
-            docker ps | grep cashpulse
-            echo "=== Deployment complete ==="
-        env:
-          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      - name: Notify on failure
+        if: failure()
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="❌ CashPulse API deploy failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
