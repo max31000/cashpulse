@@ -96,8 +96,8 @@ jobs:
               --restart unless-stopped \
               -p 127.0.0.1:5000:5000 \
               -e "ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}" \
-              -e "JwtSettings__Secret=${JWT_SECRET}" \
-              -e "TelegramSettings__BotToken=${TELEGRAM_BOT_TOKEN}" \
+              -e "Jwt__Secret=${JWT_SECRET}" \
+              -e "Telegram__BotToken=${TELEGRAM_BOT_TOKEN}" \
               ghcr.io/${{ github.repository_owner }}/cashpulse-api:latest
             sleep 3
             curl -sf http://localhost:5000/health || (echo "Health check failed!" && exit 1)
