@@ -25,7 +25,6 @@ public class JwtMiddleware
         "/health",
         "/api/auth/telegram",
         "/swagger",
-        "/swagger/v1/swagger.json",
     ];
 
     public JwtMiddleware(RequestDelegate next, IConfiguration configuration)
@@ -110,6 +109,8 @@ public class JwtMiddleware
         }
     }
 
+    // Точное совпадение, либо (только для /swagger) вложенный сегмент "/swagger/..."
     private static bool IsPublicPath(string path) =>
-        _publicPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+        _publicPaths.Contains(path.TrimEnd('/'), StringComparer.OrdinalIgnoreCase)
+        || path.StartsWith("/swagger/", StringComparison.OrdinalIgnoreCase);
 }
