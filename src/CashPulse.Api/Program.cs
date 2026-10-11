@@ -1,8 +1,14 @@
 using CashPulse.Api.Endpoints;
 using CashPulse.Api.Middleware;
 using CashPulse.Infrastructure;
+using CashPulse.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Fail fast if the JWT secret is missing/weak/default outside Development/Testing
+JwtSecretGuard.EnsureValid(
+    builder.Configuration["Jwt:Secret"],
+    builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"));
 
 // CORS — origins читаются из конфига, чтобы не хардкодить IP/домен в коде
 builder.Services.AddCors(options =>
