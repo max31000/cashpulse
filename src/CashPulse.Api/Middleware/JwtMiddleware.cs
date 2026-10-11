@@ -110,7 +110,7 @@ public class JwtMiddleware
     }
 
     // Точное совпадение, либо (только для /swagger) вложенный сегмент "/swagger/..."
-    private static bool IsPublicPath(string path) =>
+    internal static bool IsPublicPath(string path) =>
         _publicPaths.Contains(path.TrimEnd('/'), StringComparer.OrdinalIgnoreCase)
         || path.StartsWith("/swagger/", StringComparison.OrdinalIgnoreCase);
 }
