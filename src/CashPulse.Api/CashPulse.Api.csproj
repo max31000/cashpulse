@@ -15,4 +15,7 @@
     <ProjectReference Include="..\CashPulse.Core\CashPulse.Core.csproj" />
     <ProjectReference Include="..\CashPulse.Infrastructure\CashPulse.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="CashPulse.Tests" />
+  </ItemGroup>
 </Project>

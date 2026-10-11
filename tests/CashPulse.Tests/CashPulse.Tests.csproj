@@ -18,5 +18,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\CashPulse.Core\CashPulse.Core.csproj" />
     <ProjectReference Include="..\..\src\CashPulse.Infrastructure\CashPulse.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\CashPulse.Api\CashPulse.Api.csproj" />
   </ItemGroup>
 </Project>

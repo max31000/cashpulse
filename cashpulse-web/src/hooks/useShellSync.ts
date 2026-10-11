@@ -1,8 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const SHELL_ORIGIN = 'https://mvv42.ru';
-
 /**
  * Синхронизирует текущий путь с portal-shell через postMessage.
  * Работает только внутри iframe — в standalone-режиме ничего не делает.
@@ -23,7 +21,8 @@ export function useShellSync(serviceId: string) {
         serviceId,
         path: location.pathname + location.search + location.hash,
       },
-      SHELL_ORIGIN
+      // Shell и приложение живут на одном origin (https://mvv42.ru/cashpulse/)
+      window.location.origin
     );
   }, [location, serviceId]);
 }

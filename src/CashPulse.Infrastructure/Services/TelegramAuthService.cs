@@ -30,9 +30,15 @@ public class TelegramAuthService : ITelegramAuthService
 
     public bool ValidateAuthData(TelegramAuthData data)
     {
-        // 1. Проверяем свежесть данных (не старше 24 часов)
+        // 0. Без hash проверять нечего (JSON может прислать null — не допускаем NRE/500)
+        if (string.IsNullOrEmpty(data.Hash))
+            return false;
+
+        // 1. Проверяем свежесть данных (не старше 24 часов и не из будущего, допуск 60 с)
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         if (now - data.AuthDate > 86400)
+            return false;
+        if (data.AuthDate > now + 60)
             return false;
 
         // 2. Строим data_check_string: все поля кроме hash, отсортированные по ключу, через \n

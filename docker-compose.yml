@@ -32,6 +32,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://+:5000
       ConnectionStrings__DefaultConnection: "Server=mysql;Database=cashpulse;User=root;Password=${MYSQL_ROOT_PASSWORD:-cashpulse_dev};"
+      Jwt__Secret: ${JWT_SECRET:?JWT_SECRET required}
     depends_on:
       mysql:
         condition: service_healthy
