@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Api.Middleware;
 using CashPulse.Core.Interfaces.Repositories;
 using CashPulse.Core.Models;
@@ -20,20 +21,18 @@ public static class IncomeSourceEndpoints
         group.MapPost("/{id:long}/confirm-tranche", ConfirmTranche);
     }
 
-    private static ulong GetUserId(HttpContext ctx) => (ulong)ctx.Items["UserId"]!;
-
     // GET /api/income-sources
-    private static async Task<IResult> GetAll(HttpContext ctx, IIncomeSourceRepository repo)
+    private static async Task<IResult> GetAll(ICurrentUser currentUser, IIncomeSourceRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var sources = await repo.GetAllAsync(userId);
         return Results.Ok(sources);
     }
 
     // GET /api/income-sources/{id}
-    private static async Task<IResult> GetById(long id, HttpContext ctx, IIncomeSourceRepository repo)
+    private static async Task<IResult> GetById(long id, ICurrentUser currentUser, IIncomeSourceRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var source = await repo.GetByIdAsync((ulong)id, userId);
         if (source == null) throw new NotFoundException($"IncomeSource {id} not found");
         return Results.Ok(source);
@@ -42,10 +41,10 @@ public static class IncomeSourceEndpoints
     // POST /api/income-sources
     private static async Task<IResult> Create(
         IncomeSourceCreateRequest req,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IIncomeSourceRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
 
         if (string.IsNullOrWhiteSpace(req.Name))
             throw new ValidationException("Name is required");
@@ -70,10 +69,10 @@ public static class IncomeSourceEndpoints
     private static async Task<IResult> Update(
         long id,
         IncomeSourceUpdateRequest req,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IIncomeSourceRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"IncomeSource {id} not found");
 
@@ -93,9 +92,9 @@ public static class IncomeSourceEndpoints
     }
 
     // DELETE /api/income-sources/{id}
-    private static async Task<IResult> Delete(long id, HttpContext ctx, IIncomeSourceRepository repo)
+    private static async Task<IResult> Delete(long id, ICurrentUser currentUser, IIncomeSourceRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var success = await repo.DeleteAsync((ulong)id, userId);
         if (!success) throw new NotFoundException($"IncomeSource {id} not found");
         return Results.NoContent();
@@ -105,12 +104,12 @@ public static class IncomeSourceEndpoints
     private static async Task<IResult> Generate(
         long id,
         IncomeGenerateRequest req,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IIncomeSourceRepository repo,
         IOperationRepository opRepo,
         IncomeSourceExpander expander)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var source = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"IncomeSource {id} not found");
 
@@ -185,12 +184,12 @@ public static class IncomeSourceEndpoints
     private static async Task<IResult> ConfirmTranche(
         long id,
         ConfirmTrancheRequest req,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IIncomeSourceRepository repo,
         IOperationRepository opRepo,
         IncomeSourceExpander expander)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var source = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"IncomeSource {id} not found");
 

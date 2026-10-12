@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Api.Middleware;
 using CashPulse.Core.Interfaces.Repositories;
 using CashPulse.Core.Models;
@@ -16,16 +17,16 @@ public static class CategoriesEndpoints
         group.MapDelete("/{id:long}", DeleteCategory);
     }
 
-    private static async Task<IResult> GetCategories(HttpContext ctx, ICategoryRepository repo)
+    private static async Task<IResult> GetCategories(ICurrentUser currentUser, ICategoryRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var categories = await repo.GetByUserIdAsync(userId);
         return Results.Ok(categories);
     }
 
-    private static async Task<IResult> CreateCategory(CategoryRequest req, HttpContext ctx, ICategoryRepository repo)
+    private static async Task<IResult> CreateCategory(CategoryRequest req, ICurrentUser currentUser, ICategoryRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
 
         if (string.IsNullOrWhiteSpace(req.Name))
             throw new ValidationException("Name is required");
@@ -46,9 +47,9 @@ public static class CategoriesEndpoints
         return Results.Created($"/api/categories/{id}", created);
     }
 
-    private static async Task<IResult> UpdateCategory(long id, CategoryRequest req, HttpContext ctx, ICategoryRepository repo)
+    private static async Task<IResult> UpdateCategory(long id, CategoryRequest req, ICurrentUser currentUser, ICategoryRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Category {id} not found");
 
@@ -65,9 +66,9 @@ public static class CategoriesEndpoints
         return Results.Ok(existing);
     }
 
-    private static async Task<IResult> DeleteCategory(long id, HttpContext ctx, ICategoryRepository repo)
+    private static async Task<IResult> DeleteCategory(long id, ICurrentUser currentUser, ICategoryRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Category {id} not found");
 
@@ -79,7 +80,6 @@ public static class CategoriesEndpoints
         return Results.NoContent();
     }
 
-    private static ulong GetUserId(HttpContext ctx) => (ulong)ctx.Items["UserId"]!;
 }
 
 public record CategoryRequest(

@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Core.Forecast;
 using CashPulse.Core.Services;
 
@@ -12,12 +13,12 @@ public static class ForecastEndpoints
     }
 
     private static async Task<IResult> GetForecast(
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IForecastService forecastService,
         int horizonMonths = 6,
         bool includeScenarios = true)
     {
-        var userId = (ulong)ctx.Items["UserId"]!;
+        var userId = await currentUser.GetIdAsync();
 
         if (horizonMonths < 1 || horizonMonths > 24)
             throw new CashPulse.Api.Middleware.ValidationException("horizonMonths must be between 1 and 24");

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using CashPulse.Api.Auth;
 
 namespace CashPulse.Api.Middleware;
 
@@ -19,6 +20,10 @@ public class ErrorHandlingMiddleware
         try
         {
             await _next(context);
+        }
+        catch (UnauthenticatedException ex)
+        {
+            await WriteErrorResponse(context, HttpStatusCode.Unauthorized, ex.Message, nameof(UnauthenticatedException));
         }
         catch (NotFoundException ex)
         {

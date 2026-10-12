@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Api.Middleware;
 using CashPulse.Core.Interfaces.Repositories;
 using CashPulse.Core.Models;
@@ -17,16 +18,16 @@ public static class ScenariosEndpoints
         group.MapPut("/{id:long}/toggle", ToggleScenario);
     }
 
-    private static async Task<IResult> GetScenarios(HttpContext ctx, IScenarioRepository repo)
+    private static async Task<IResult> GetScenarios(ICurrentUser currentUser, IScenarioRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var scenarios = await repo.GetByUserIdAsync(userId);
         return Results.Ok(scenarios);
     }
 
-    private static async Task<IResult> CreateScenario(ScenarioRequest req, HttpContext ctx, IScenarioRepository repo)
+    private static async Task<IResult> CreateScenario(ScenarioRequest req, ICurrentUser currentUser, IScenarioRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
 
         if (string.IsNullOrWhiteSpace(req.Name))
             throw new ValidationException("Name is required");
@@ -44,9 +45,9 @@ public static class ScenariosEndpoints
         return Results.Created($"/api/scenarios/{id}", created);
     }
 
-    private static async Task<IResult> UpdateScenario(long id, ScenarioRequest req, HttpContext ctx, IScenarioRepository repo)
+    private static async Task<IResult> UpdateScenario(long id, ScenarioRequest req, ICurrentUser currentUser, IScenarioRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Scenario {id} not found");
 
@@ -57,24 +58,23 @@ public static class ScenariosEndpoints
         return Results.Ok(existing);
     }
 
-    private static async Task<IResult> DeleteScenario(long id, HttpContext ctx, IScenarioRepository repo)
+    private static async Task<IResult> DeleteScenario(long id, ICurrentUser currentUser, IScenarioRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var success = await repo.DeleteAsync((ulong)id, userId);
         if (!success) throw new NotFoundException($"Scenario {id} not found");
         return Results.NoContent();
     }
 
-    private static async Task<IResult> ToggleScenario(long id, HttpContext ctx, IScenarioRepository repo)
+    private static async Task<IResult> ToggleScenario(long id, ICurrentUser currentUser, IScenarioRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var success = await repo.ToggleActiveAsync((ulong)id, userId);
         if (!success) throw new NotFoundException($"Scenario {id} not found");
         var scenario = await repo.GetByIdAsync((ulong)id, userId);
         return Results.Ok(scenario);
     }
 
-    private static ulong GetUserId(HttpContext ctx) => (ulong)ctx.Items["UserId"]!;
 }
 
 public record ScenarioRequest(string? Name, string? Description);

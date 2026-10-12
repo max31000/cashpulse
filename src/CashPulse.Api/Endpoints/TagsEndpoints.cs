@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Core.Services;
 
 namespace CashPulse.Api.Endpoints;
@@ -11,10 +12,10 @@ public static class TagsEndpoints
     }
 
     private static async Task<IResult> GetTagsSummary(
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IForecastService forecastService)
     {
-        var userId = (ulong)ctx.Items["UserId"]!;
+        var userId = await currentUser.GetIdAsync();
         // Build forecast with 0 months just to get tag summaries (short horizon)
         var result = await forecastService.BuildForecastAsync(userId, 1, false);
         return Results.Ok(result.TagSummaries);
