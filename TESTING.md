@@ -1,3 +1,9 @@
+> **2026-10: актуализация.** Собственный Telegram-логин и HS256-JWT удалены — аутентификация общая (mvv42-auth).
+> Примеры ниже про `TelegramAuthService` / `JwtTestHelper` / `useAuthStore` устарели. Сейчас: интеграционные тесты
+> подписывают ES256-токен тестовым ключом (`Infrastructure/Mvv42TestAuth.cs`) и шлют его cookie `__Host-mvv42_at`;
+> юнит-тесты `tests/CashPulse.Tests/Auth` проверяют провижининг по `tg`, `sub ≠ локальный id` и 401 у всех эндпоинтов
+> кроме `/health` (без Docker). Фронт: `src/api/client.test.ts`, `src/App.test.tsx` (msw, мок `/auth/api/me`).
+
 # TESTING.md — Стратегия тестирования CashPulse
 
 ## 1. Цели и принципы тестирования

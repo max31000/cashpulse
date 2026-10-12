@@ -60,7 +60,11 @@ yarn dev
 # Приложение на http://localhost:5173
 ```
 
-**Фронтенд по умолчанию стучится на `http://localhost:5000` (переменная `VITE_API_URL`).**
+**Фронтенд зовёт API same-origin: `/cashpulse/api/…` (Vite проксирует на `http://localhost:5000/api/…`, `/auth` — на
+локальный mvv42-auth `http://localhost:5010`; переопределяются `CASHPULSE_API_TARGET` / `MVV42_AUTH_TARGET`).**
+
+Вход — общий аккаунт mvv42 (`mvv42-auth`, cookie `mvv42_at` в Development): своего логина и JWT-секрета у CashPulse нет.
+Локальный пользователь находится/создаётся по Telegram id (`tg` claim) при первом запросе — с набором категорий по умолчанию.
 
 ### Переменные окружения
 
@@ -70,8 +74,7 @@ yarn dev
 # Backend
 ConnectionStrings__DefaultConnection="Server=localhost;Database=cashpulse;User=root;Password=cashpulse_dev;"
 
-# Frontend (cashpulse-web/.env)
-VITE_API_URL=http://localhost:5000
+# Frontend: не нужно (API same-origin через прокси Vite). VITE_API_URL — только префикс, по умолчанию /cashpulse
 ```
 
 ---
@@ -103,15 +106,14 @@ bash scripts/deploy-vds.sh
 | `VDS_USER` | SSH пользователь | `root` |
 | `VDS_SSH_KEY` | Приватный SSH ключ | Содержимое `~/.ssh/cashpulse_deploy` |
 | `DB_CONNECTION_STRING` | MySQL строка подключения | `Server=cashpulse-mysql;Database=cashpulse;User=root;Password=<пароль>;` |
-| `VITE_API_URL` | URL бэкенда (для фронтенда) | `http://89.167.34.3:5000` |
 
 ### CI/CD
 
-После настройки Secrets — любой `git push origin main` автоматически:
-- Запускает тесты
-- Собирает Docker-образ бэкенда
-- Деплоит на VDS
-- Деплоит фронтенд на GitHub Pages (`https://max31000.github.io/cashpulse/`)
+Один workflow `.github/workflows/deploy.yml`: при `git push origin main` job `changes` (paths-filter) решает, что
+изменилось; `backend` (тесты → образ `ghcr.io/…/cashpulse-api:sha-<sha>` → контейнер с меткой
+`com.centurylinklabs.watchtower.enable=false` → health) идёт до `frontend` (тесты → сборка → `/var/www/cashpulse`).
+Изменился только фронт — backend пропускается, фронт всё равно деплоится. `workflow_dispatch` деплоит оба.
+Контейнеру API нужны только `DB_CONNECTION_STRING` и сеть `cashpulse-network` (JWKS `http://mvv42-auth:8080`).
 
 ---
 
