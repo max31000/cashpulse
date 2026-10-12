@@ -1,7 +1,10 @@
 import { setupServer } from 'msw/node';
 import { http, HttpResponse } from 'msw';
+import { meSignedIn } from './fixtures';
 
 export const handlers = [
+  // mvv42-auth (shared login): signed in, access to cashpulse granted
+  http.get('*/auth/api/me', () => HttpResponse.json(meSignedIn)),
   http.get('*/api/accounts', () =>
     HttpResponse.json([
       { id: 1, name: 'Основной', type: 'debit', isArchived: false,
@@ -16,12 +19,15 @@ export const handlers = [
       { status: 201 }
     )
   ),
-  http.get('*/api/operations', () => HttpResponse.json({ items: [], total: 0 })),
+  http.get('*/api/operations', () => HttpResponse.json([])),
   http.get('*/api/forecast', () =>
     HttpResponse.json({ timelines: {}, netWorth: [], alerts: [], monthlyBreakdown: [] })
   ),
   http.get('*/api/categories', () => HttpResponse.json([])),
   http.get('*/api/exchange-rates', () => HttpResponse.json([])),
+  http.get('*/api/scenarios', () => HttpResponse.json([])),
+  http.get('*/api/tags/summary', () => HttpResponse.json([])),
+  http.get('*/api/income-sources', () => HttpResponse.json([])),
 ];
 
 export const server = setupServer(...handlers);

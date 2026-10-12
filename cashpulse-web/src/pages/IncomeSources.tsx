@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import {
-  Stack, Title, Group, Button, Text, Card, Badge, Skeleton,
-} from '@mantine/core';
+import { Badge, Button, Group, Skeleton, Stack, Text } from '@mantine/core';
+import { EmptyState, Page, Section } from '@mvv42/kit';
+import { IconBolt, IconCash, IconPencil, IconPlayerPause, IconPlayerPlay, IconPlus } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useIncomeSourceStore } from '../store/useIncomeSourceStore';
@@ -22,87 +22,61 @@ interface IncomeSourceCardProps {
   onToggleActive: (s: IncomeSource) => void;
 }
 
+function trancheAmount(t: IncomeSource['tranches'][number], source: IncomeSource): string {
+  if (t.amountMode === 'Fixed') return formatMoney(t.fixedAmount ?? 0, source.currency);
+  if (t.amountMode === 'PercentOfTotal') return `${t.percentOfTotal}% от ${formatMoney(source.expectedTotal ?? 0, source.currency)}`;
+  return `≈ ${formatMoney(t.fixedAmount ?? 0, source.currency)}`;
+}
+
 function IncomeSourceCard({ source, onEdit, onGenerate, onToggleActive }: IncomeSourceCardProps) {
   return (
-    <Card withBorder p="lg" radius="md" shadow="sm">
-      <Card.Section withBorder inheritPadding py="xs">
-        <Group justify="space-between">
-          <Group gap="xs">
-            <Text fw={700} fz="lg">{source.name}</Text>
-            <Badge
-              size="sm"
-              color={source.isActive ? 'green' : 'gray'}
-              variant="light"
-            >
-              {source.isActive ? 'Активен' : 'Неактивен'}
-            </Badge>
-          </Group>
-          {source.expectedTotal !== undefined && source.expectedTotal > 0 && (
-            <Text fz="xl" fw={700} c="green">
-              {formatMoney(source.expectedTotal, source.currency)} / мес
-            </Text>
-          )}
+    <Section
+      title={
+        <Group gap="xs" component="span">
+          {source.name}
+          <Badge size="sm" color={source.isActive ? 'green' : 'gray'}>
+            {source.isActive ? 'Активен' : 'Неактивен'}
+          </Badge>
         </Group>
-      </Card.Section>
-
-      <Stack gap={4} mt="sm">
-        <Group gap="md">
-          <Group gap={4}>
-            <Text fz="xs" c="dimmed">Валюта:</Text>
-            <Badge size="xs" variant="outline">{source.currency}</Badge>
-          </Group>
-          <Group gap={4}>
-            <Text fz="xs" c="dimmed">Траншей:</Text>
-            <Text fz="xs" fw={600}>{source.tranches.length}</Text>
-          </Group>
-        </Group>
-
-        {source.tranches.slice(0, 2).map((t) => (
-          <Text key={t.id ?? t.name} fz="xs" c="dimmed">
-            · {t.name} — {t.dayOfMonth === -1 ? 'последний день' : `${t.dayOfMonth}-го`}
-            {' '}({t.amountMode === 'Fixed'
-              ? formatMoney(t.fixedAmount ?? 0, source.currency)
-              : t.amountMode === 'PercentOfTotal'
-              ? `${t.percentOfTotal}% от ${formatMoney(source.expectedTotal ?? 0, source.currency)}`
-              : `≈ ${formatMoney(t.fixedAmount ?? 0, source.currency)}`
-            })
+      }
+      description={`${source.currency} · траншей: ${source.tranches.length}`}
+      actions={
+        source.expectedTotal !== undefined && source.expectedTotal > 0 ? (
+          <Text fz="lg" fw={600} className="mvv-num">
+            {formatMoney(source.expectedTotal, source.currency)}
+            <Text span fz="sm" c="dimmed" fw={400}> / мес</Text>
+          </Text>
+        ) : undefined
+      }
+    >
+      <Stack gap={4}>
+        {source.tranches.slice(0, 3).map((t) => (
+          <Text key={t.id ?? t.name} fz="sm" c="dimmed">
+            {t.name} — {t.dayOfMonth === -1 ? 'последний день' : `${t.dayOfMonth}-го`} · <span className="mvv-num">{trancheAmount(t, source)}</span>
           </Text>
         ))}
-        {source.tranches.length > 2 && (
-          <Text fz="xs" c="dimmed">+ ещё {source.tranches.length - 2} транша</Text>
+        {source.tranches.length > 3 && (
+          <Text fz="sm" c="dimmed">и ещё {source.tranches.length - 3}</Text>
         )}
       </Stack>
-
-      <Card.Section withBorder inheritPadding pt="sm" mt="md">
-        <Group justify="space-between">
-          <Group gap="xs">
-            <Button
-              variant="subtle"
-              size="xs"
-              onClick={(e) => { e.stopPropagation(); onEdit(source); }}
-            >
-              ✏️ Редактировать
-            </Button>
-            <Button
-              variant="subtle"
-              size="xs"
-              color={source.isActive ? 'gray' : 'green'}
-              onClick={(e) => { e.stopPropagation(); onToggleActive(source); }}
-            >
-              {source.isActive ? '⏸ Деактивировать' : '▶ Активировать'}
-            </Button>
-          </Group>
-          <Button
-            variant="light"
-            size="xs"
-            color="blue"
-            onClick={(e) => { e.stopPropagation(); onGenerate(source); }}
-          >
-            ⚡ Сгенерировать операции
-          </Button>
-        </Group>
-      </Card.Section>
-    </Card>
+      <Group gap="xs" mt="md">
+        <Button variant="light" size="xs" leftSection={<IconBolt size={14} />} onClick={() => onGenerate(source)}>
+          Сгенерировать операции
+        </Button>
+        <Button variant="subtle" size="xs" leftSection={<IconPencil size={14} />} onClick={() => onEdit(source)}>
+          Изменить
+        </Button>
+        <Button
+          variant="subtle"
+          size="xs"
+          color="gray"
+          leftSection={source.isActive ? <IconPlayerPause size={14} /> : <IconPlayerPlay size={14} />}
+          onClick={() => onToggleActive(source)}
+        >
+          {source.isActive ? 'Отключить' : 'Включить'}
+        </Button>
+      </Group>
+    </Section>
   );
 }
 
@@ -143,29 +117,25 @@ export default function IncomeSources() {
   };
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between">
-        <Title order={2}>Источники дохода</Title>
-        <Button variant="filled" onClick={handleAdd}>+ Источник дохода</Button>
-      </Group>
-      <Text c="dimmed" fz="sm">
-        Зарплата, вклады, купоны и другие регулярные поступления с разбивкой по счетам.
-      </Text>
+    <Page
+      title="Источники дохода"
+      description="Зарплата, вклады, купоны и другие регулярные поступления с разбивкой по счетам"
+      actions={<Button leftSection={<IconPlus size={16} />} onClick={handleAdd}>Источник дохода</Button>}
+    >
 
       {loading ? (
         <Stack gap="sm">
           {[1, 2, 3].map((i) => <Skeleton key={i} h={120} radius="md" />)}
         </Stack>
       ) : sources.length === 0 ? (
-        <Stack align="center" py="xl" gap="sm">
-          <Text fz="4xl">💵</Text>
-          <Text fw={600}>Нет источников дохода</Text>
-          <Text c="dimmed" fz="sm" ta="center" maw={320}>
-            Добавьте первый источник, чтобы отслеживать поступления и автоматически
-            распределять их по счетам
-          </Text>
-          <Button onClick={handleAdd}>+ Источник дохода</Button>
-        </Stack>
+        <Section>
+          <EmptyState
+            icon={<IconCash size={22} />}
+            title="Нет источников дохода"
+            description="Добавьте первый источник, чтобы отслеживать поступления и автоматически распределять их по счетам."
+            action={<Button onClick={handleAdd}>Источник дохода</Button>}
+          />
+        </Section>
       ) : (
         <Stack gap="sm">
           {sources.map((s) => (
@@ -201,6 +171,6 @@ export default function IncomeSources() {
           accounts={accounts}
         />
       )}
-    </Stack>
+    </Page>
   );
 }

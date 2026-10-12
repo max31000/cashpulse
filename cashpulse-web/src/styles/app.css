@@ -1,0 +1,443 @@
+/*
+ * CashPulse-specific pieces on top of @mvv42/kit. Only kit tokens (--mvv-*) — no raw colours.
+ * Everything generic (page, sections, metrics, states, tables, inputs) comes from the kit.
+ */
+
+/* ---------------------------------------------------------------- helpers */
+
+.cp-truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-clickable {
+  cursor: pointer;
+}
+
+.cp-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--mvv-r-xs);
+  box-shadow: inset 0 0 0 1px var(--mvv-border);
+  vertical-align: middle;
+}
+
+.cp-dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--mvv-r-full);
+}
+
+.cp-nowrap {
+  white-space: nowrap;
+}
+
+.cp-grow {
+  flex: 1;
+}
+
+.cp-inline-icon {
+  margin-left: 6px;
+  vertical-align: -1px;
+  color: var(--mvv-text-3);
+}
+
+.cp-link {
+  font-size: var(--mvv-fs-13);
+  color: var(--mvv-accent);
+  text-decoration: none;
+}
+
+.cp-link:hover {
+  text-decoration: underline;
+}
+
+.cp-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--mvv-sp-6);
+  align-items: start;
+}
+
+.cp-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mvv-sp-6);
+  min-width: 0;
+}
+
+.cp-stack[data-gap='sm'] {
+  gap: var(--mvv-sp-2);
+}
+
+@media (max-width: 960px) {
+  .cp-dashboard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------- operation list */
+
+.cp-op-group + .cp-op-group {
+  border-top: 1px solid var(--mvv-border);
+}
+
+.cp-op-date {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--mvv-sp-2) var(--mvv-sp-5);
+  background: var(--mvv-surface-2);
+  border-bottom: 1px solid var(--mvv-border);
+  font-size: var(--mvv-fs-12);
+  font-weight: var(--mvv-fw-medium);
+  color: var(--mvv-text-3);
+}
+
+.cp-op-date::first-letter {
+  text-transform: uppercase;
+}
+
+.cp-op-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Status rail: confirmed = success, planned = accent; dashed for the future; overdue plan gets a warning tint. */
+.cp-op-row {
+  --cp-rail: var(--mvv-accent);
+  --cp-rail-style: solid;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--mvv-sp-3);
+  min-height: 52px;
+  padding: var(--mvv-sp-2) var(--mvv-sp-3) var(--mvv-sp-2) var(--mvv-sp-5);
+  transition: background-color var(--mvv-dur-fast) var(--mvv-ease);
+}
+
+.cp-op-row + .cp-op-row {
+  border-top: 1px solid var(--mvv-border);
+}
+
+.cp-op-row::before {
+  content: '';
+  position: absolute;
+  left: var(--mvv-sp-2);
+  top: var(--mvv-sp-2);
+  bottom: var(--mvv-sp-2);
+  border-left: 3px var(--cp-rail-style) var(--cp-rail);
+  border-radius: var(--mvv-r-full);
+}
+
+.cp-op-row:hover {
+  background: var(--mvv-surface-hover);
+}
+
+.cp-op-row[data-status='confirmed'] {
+  --cp-rail: var(--mvv-success);
+}
+
+.cp-op-row[data-future] {
+  --cp-rail-style: dashed;
+}
+
+.cp-op-row[data-overdue] {
+  --cp-rail: var(--mvv-warning);
+  background: var(--mvv-warning-bg);
+}
+
+.cp-op-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cp-op-title {
+  font-size: var(--mvv-fs-14);
+  font-weight: var(--mvv-fw-medium);
+  color: var(--mvv-text);
+}
+
+.cp-op-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mvv-sp-1) var(--mvv-sp-2);
+  font-size: var(--mvv-fs-12);
+  color: var(--mvv-text-3);
+}
+
+.cp-meta-item + .cp-meta-item::before {
+  content: '·';
+  margin-right: var(--mvv-sp-2);
+}
+
+.cp-meta-item[data-overdue] {
+  color: var(--mvv-warning);
+  font-weight: var(--mvv-fw-medium);
+}
+
+/* Keeps amounts aligned whether or not a row has the «confirm» action (ActionIcon sm = 28px). */
+.cp-op-action-slot {
+  flex: none;
+  width: 28px;
+}
+
+.cp-op-meta .cp-dot {
+  margin-right: 6px;
+}
+
+.cp-op-side {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--mvv-sp-1);
+}
+
+.cp-op-amount {
+  min-width: 96px;
+  text-align: right;
+  font-size: var(--mvv-fs-14);
+  font-weight: var(--mvv-fw-semibold);
+  white-space: nowrap;
+}
+
+.cp-amount[data-sign='pos'],
+.cp-op-amount[data-sign='pos'] {
+  color: var(--mvv-success);
+}
+
+.cp-amount[data-sign='neg'],
+.cp-op-amount[data-sign='neg'] {
+  color: var(--mvv-danger);
+}
+
+@media (max-width: 640px) {
+  .cp-op-row {
+    flex-wrap: wrap;
+    padding-left: var(--mvv-sp-4);
+  }
+
+  .cp-op-date {
+    padding: var(--mvv-sp-2) var(--mvv-sp-4);
+  }
+
+  .cp-op-main {
+    flex-basis: calc(100% - 120px);
+  }
+
+  .cp-op-amount {
+    min-width: 0;
+  }
+
+  .cp-op-side {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: calc(var(--mvv-sp-1) * -1);
+  }
+}
+
+/* ---------------------------------------------------------------- compact lists (dashboard) */
+
+.cp-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cp-list-item {
+  display: flex;
+  align-items: center;
+  gap: var(--mvv-sp-3);
+  padding: var(--mvv-sp-2) var(--mvv-sp-5);
+  min-height: 44px;
+}
+
+.cp-list-item + .cp-list-item {
+  border-top: 1px solid var(--mvv-border);
+}
+
+.cp-list-link {
+  display: block;
+  padding: var(--mvv-sp-3) var(--mvv-sp-5);
+  border-top: 1px solid var(--mvv-border);
+  font-size: var(--mvv-fs-13);
+  color: var(--mvv-accent);
+  text-decoration: none;
+}
+
+.cp-list-link:hover {
+  background: var(--mvv-surface-hover);
+}
+
+.cp-list-date {
+  flex: none;
+  width: 44px;
+  font-size: var(--mvv-fs-12);
+  color: var(--mvv-text-3);
+}
+
+/* ---------------------------------------------------------------- account tiles */
+
+.cp-account {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mvv-sp-2);
+  height: 100%;
+  padding: var(--mvv-sp-4) var(--mvv-sp-5);
+  border-radius: var(--mvv-r-md);
+  background: var(--mvv-surface);
+  box-shadow:
+    0 0 0 1px var(--mvv-border),
+    var(--mvv-shadow-xs);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    box-shadow var(--mvv-dur-fast) var(--mvv-ease),
+    background-color var(--mvv-dur-fast) var(--mvv-ease);
+}
+
+a.cp-account:hover {
+  box-shadow:
+    0 0 0 1px var(--mvv-border-strong),
+    var(--mvv-shadow-sm);
+}
+
+a.cp-account:focus-visible {
+  outline: 2px solid var(--mvv-focus-ring);
+  outline-offset: 2px;
+}
+
+.cp-account[data-archived] {
+  opacity: 0.6;
+}
+
+.cp-account-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mvv-sp-2);
+}
+
+.cp-account-name {
+  font-size: var(--mvv-fs-15);
+  font-weight: var(--mvv-fw-semibold);
+}
+
+.cp-account-balance {
+  font-size: var(--mvv-fs-22);
+  font-weight: var(--mvv-fw-semibold);
+  letter-spacing: var(--mvv-tracking-title);
+  line-height: var(--mvv-lh-tight);
+}
+
+.cp-account-foot {
+  display: flex;
+  gap: var(--mvv-sp-1);
+  margin-top: auto;
+  padding-top: var(--mvv-sp-2);
+  border-top: 1px solid var(--mvv-border);
+}
+
+/* ---------------------------------------------------------------- forecast */
+
+.cp-monthly-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.2fr) repeat(3, minmax(0, 1fr));
+  gap: var(--mvv-sp-3);
+  width: 100%;
+  font-size: var(--mvv-fs-13);
+}
+
+.cp-monthly-row > :not(:first-child) {
+  text-align: right;
+}
+
+.cp-monthly-head {
+  padding: 0 var(--mvv-sp-5) var(--mvv-sp-2) calc(var(--mvv-sp-5) + 28px);
+  font-size: var(--mvv-fs-12);
+  color: var(--mvv-text-3);
+}
+
+@media (max-width: 640px) {
+  .cp-monthly-row {
+    grid-template-columns: minmax(84px, 1.25fr) repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    font-size: var(--mvv-fs-12);
+  }
+
+  .cp-monthly-head {
+    padding: 0 var(--mvv-sp-4) var(--mvv-sp-2) calc(var(--mvv-sp-4) + 28px);
+  }
+}
+
+.cp-title-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.cp-title-link:hover {
+  color: var(--mvv-accent);
+}
+
+.cp-muted-icon {
+  color: var(--mvv-text-3);
+}
+
+.cp-sort {
+  font: inherit;
+  color: inherit;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- dashboard account rows */
+
+.cp-acc-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--mvv-sp-3) var(--mvv-sp-5);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--mvv-dur-fast) var(--mvv-ease);
+}
+
+.cp-acc-row + .cp-acc-row {
+  border-top: 1px solid var(--mvv-border);
+}
+
+.cp-acc-row:hover {
+  background: var(--mvv-surface-hover);
+}
+
+.cp-acc-row:focus-visible {
+  outline: 2px solid var(--mvv-focus-ring);
+  outline-offset: -2px;
+}
+
+.cp-acc-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mvv-sp-3);
+}
+
+.cp-acc-name {
+  font-size: var(--mvv-fs-14);
+  font-weight: var(--mvv-fw-medium);
+}
+
+.cp-acc-balance {
+  flex: none;
+  font-size: var(--mvv-fs-15);
+  font-weight: var(--mvv-fw-semibold);
+}

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Paper, Stack, Text, Alert, Badge, Group, Button, Skeleton } from '@mantine/core';
+import { Alert, Badge, Button, Skeleton, Stack, Text } from '@mantine/core';
+import { Section } from '@mvv42/kit';
+import { IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconUrgent } from '@tabler/icons-react';
 import type { ForecastAlert } from '../../api/types';
 import { formatDateCompact } from '../../utils/formatDate';
 
@@ -8,44 +10,40 @@ interface Props {
   loading: boolean;
 }
 
+const SEVERITY = {
+  critical: { color: 'red', title: 'Критично', Icon: IconUrgent },
+  warning: { color: 'yellow', title: 'Предупреждение', Icon: IconAlertTriangle },
+  info: { color: 'blue', title: 'Информация', Icon: IconInfoCircle },
+} as const;
+
 function AlertItem({ alert }: { alert: ForecastAlert }) {
   const [open, setOpen] = useState(false);
-
-  const color = alert.severity === 'critical' ? 'red' : alert.severity === 'warning' ? 'yellow' : 'blue';
-  const icon = alert.severity === 'critical' ? '🚨' : alert.severity === 'warning' ? '⚠️' : 'ℹ️';
-  const title = alert.severity === 'critical' ? 'Критично' : alert.severity === 'warning' ? 'Предупреждение' : 'Информация';
-
-  const shortMessage =
-    alert.message.length > 80 ? alert.message.slice(0, 80) + '…' : alert.message;
+  const meta = SEVERITY[alert.severity as keyof typeof SEVERITY] ?? SEVERITY.info;
+  const long = alert.message.length > 80;
+  const shortMessage = long ? alert.message.slice(0, 80) + '…' : alert.message;
 
   return (
     <Alert
-      color={color}
-      variant="light"
+      color={meta.color}
+      icon={<meta.Icon size={18} stroke={1.75} />}
       title={
-        <Group justify="space-between" wrap="nowrap">
-          <Text fz="sm" fw={600}>{icon} {title}</Text>
-          <Text fz="xs" c="dimmed">{formatDateCompact(alert.date)}</Text>
-        </Group>
+        <>
+          {meta.title}
+          <Text span fz="xs" c="dimmed" fw={400} ml={8} className="mvv-num">
+            {formatDateCompact(alert.date)}
+          </Text>
+        </>
       }
     >
-      <Text fz="xs">{open ? alert.message : shortMessage}</Text>
-      {open && (
-        <Text fz="xs" mt="xs" c="dimmed">
+      <Text fz="sm">{open ? alert.message : shortMessage}</Text>
+      {open && alert.suggestedAction && (
+        <Text fz="sm" mt="xs" c="dimmed">
           Рекомендация: {alert.suggestedAction}
         </Text>
       )}
-      {(alert.message.length > 80 || alert.suggestedAction) && (
-        <Button
-          variant="subtle"
-          size="xs"
-          fz="xs"
-          mt={4}
-          p={0}
-          h="auto"
-          onClick={() => setOpen(!open)}
-        >
-          {open ? 'Свернуть ▲' : 'Развернуть ▼'}
+      {(long || alert.suggestedAction) && (
+        <Button variant="subtle" size="compact-xs" mt={4} px={0} onClick={() => setOpen(!open)}>
+          {open ? 'Свернуть' : 'Развернуть'}
         </Button>
       )}
     </Alert>
@@ -58,29 +56,20 @@ export function AlertsPanel({ alerts, loading }: Props) {
   const visibleAlerts = showAll ? alerts : alerts.slice(0, 5);
   const hiddenCount = alerts.length - 5;
 
-  if (loading) {
-    return (
-      <Paper p="md" withBorder radius="md">
-        <Skeleton h={20} mb="sm" width="60%" />
-        {[1, 2, 3].map((i) => (
-          <Skeleton key={i} h={64} mb="sm" />
-        ))}
-      </Paper>
-    );
-  }
-
   return (
-    <Paper p="md" withBorder radius="md">
-      <Group justify="space-between" mb="sm">
-        <Text fz="sm" fw={600} c="dimmed" tt="uppercase">Предупреждения</Text>
-        {criticalCount > 0 && (
-          <Badge color="red" variant="filled" size="sm">{criticalCount}</Badge>
-        )}
-      </Group>
-
-      {alerts.length === 0 ? (
-        <Alert color="green" variant="light" title="Всё в порядке">
-          <Text fz="xs">Критических предупреждений нет</Text>
+    <Section
+      title="Предупреждения"
+      actions={criticalCount > 0 ? <Badge color="red" variant="filled" size="sm">{criticalCount}</Badge> : undefined}
+    >
+      {loading ? (
+        <Stack gap="sm">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} h={64} />
+          ))}
+        </Stack>
+      ) : alerts.length === 0 ? (
+        <Alert color="green" icon={<IconCircleCheck size={18} stroke={1.75} />} title="Всё в порядке">
+          <Text fz="sm">Критических предупреждений нет</Text>
         </Alert>
       ) : (
         <Stack gap="xs">
@@ -88,12 +77,12 @@ export function AlertsPanel({ alerts, loading }: Props) {
             <AlertItem key={idx} alert={alert} />
           ))}
           {!showAll && hiddenCount > 0 && (
-            <Button variant="subtle" size="xs" fz="xs" onClick={() => setShowAll(true)}>
+            <Button variant="subtle" size="xs" onClick={() => setShowAll(true)}>
               Показать ещё {hiddenCount}
             </Button>
           )}
         </Stack>
       )}
-    </Paper>
+    </Section>
   );
 }
