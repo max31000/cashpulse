@@ -95,7 +95,7 @@ public class Mvv42AuthEndpointsTests
         // Mirrors production row id=1 (email user, no Telegram id): a new mvv42 user must never be mapped onto it.
         await using var conn = new MySqlConnection(_factory.Database.ConnectionString);
         await conn.ExecuteAsync(@"INSERT INTO Users (Id, TelegramId, Email, DisplayName, BaseCurrency)
-            VALUES (500, NULL, 'dev@local', 'Dev User', 'RUB') ON DUPLICATE KEY UPDATE Email = Email");
+            VALUES (500, NULL, 'legacy-500@local', 'Dev User', 'RUB') ON DUPLICATE KEY UPDATE Email = Email");
         const long telegramId = 5_550_002;
 
         var client = _factory.CreateClientWithToken(Mvv42TestAuth.CreateToken(telegramId, sub: "500", name: "Новый"));
@@ -105,7 +105,7 @@ public class Mvv42AuthEndpointsTests
             "SELECT TelegramId, DisplayName, Email FROM Users WHERE Id = 500");
         legacy.TelegramId.Should().BeNull();
         legacy.DisplayName.Should().Be("Dev User");
-        legacy.Email.Should().Be("dev@local");
+        legacy.Email.Should().Be("legacy-500@local");
         (await conn.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM Categories WHERE UserId = 500")).Should().Be(0);
 
         var newId = await conn.ExecuteScalarAsync<ulong>("SELECT Id FROM Users WHERE TelegramId = @telegramId", new { telegramId });
