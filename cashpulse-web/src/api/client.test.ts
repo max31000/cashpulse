@@ -82,6 +82,7 @@ describe('apiClient', () => {
 
   it('401 then a successful refresh retries once and succeeds', async () => {
     // jsdom's AbortSignal is not accepted by Node's fetch: drop the kit's refresh timeout signal here.
+    // TODO(kit >= 0.1.2): remove once the kit's jsdom AbortSignal fix is in.
     const timeout = AbortSignal.timeout;
     (AbortSignal as { timeout?: unknown }).timeout = undefined;
     onTestFinished(() => {

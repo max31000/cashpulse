@@ -152,4 +152,46 @@ public class EndpointAuthorizationTests : IClassFixture<EndpointAuthorizationTes
         var response = await client.PostAsync("/api/exchange-rates/refresh", null);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task UnsafeCookieRequest_WithoutOriginOrReferer_Returns403()
+    {
+        var client = ClientWith(Mvv42TestAuth.CreateToken(42, "1"));
+        client.DefaultRequestHeaders.Remove("Origin");
+        var response = await client.PostAsync("/api/exchange-rates/refresh", null);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Contains("origin_not_allowed", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task UnsafeCookieRequest_WithOurRefererAndNoOrigin_PassesTheOriginCheck()
+    {
+        var client = ClientWith(Mvv42TestAuth.CreateToken(42, "1"));
+        client.DefaultRequestHeaders.Remove("Origin");
+        client.DefaultRequestHeaders.Referrer = new Uri("https://mvv42.ru/cashpulse/settings");
+        var response = await client.PostAsync("/api/exchange-rates/refresh", null);
+        // past the Origin filter and authorization; the handler then fails on the absent database
+        Assert.NotEqual(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UnsafeCookieRequest_WithForeignReferer_Returns403()
+    {
+        var client = ClientWith(Mvv42TestAuth.CreateToken(42, "1"));
+        client.DefaultRequestHeaders.Remove("Origin");
+        client.DefaultRequestHeaders.Referrer = new Uri("https://evil.example/page");
+        var response = await client.PostAsync("/api/exchange-rates/refresh", null);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task NoCorsHeaders_AreSentToForeignOrigins()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Options, "/api/accounts");
+        request.Headers.Add("Origin", "http://localhost:5173");
+        request.Headers.Add("Access-Control-Request-Method", "GET");
+        var response = await _factory.CreateClient().SendAsync(request);
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+    }
 }

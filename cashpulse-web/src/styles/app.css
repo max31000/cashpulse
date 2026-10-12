@@ -47,6 +47,7 @@
   color: var(--mvv-text-3);
 }
 
+/* TODO(kit >= 0.1.2): replace with the kit TextLink. */
 .cp-link {
   font-size: var(--mvv-fs-13);
   color: var(--mvv-accent);
@@ -246,7 +247,8 @@
   }
 }
 
-/* ---------------------------------------------------------------- compact lists (dashboard) */
+/* ---------------------------------------------------------------- compact lists (dashboard)
+ * TODO(kit >= 0.1.2): replace .cp-list / .cp-list-item / .cp-acc-row with the kit DataList. */
 
 .cp-list {
   margin: 0;

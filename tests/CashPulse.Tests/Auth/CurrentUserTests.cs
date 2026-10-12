@@ -13,7 +13,6 @@ namespace CashPulse.Tests.Auth;
 public class CurrentUserTests
 {
     private readonly Mock<IUserRepository> _users = new();
-    private readonly Mock<ICategoryRepository> _categories = new();
 
     private static ClaimsPrincipal Mvv42Principal(string sub, long tg, string name = "Test") =>
         new(new ClaimsIdentity(
@@ -25,7 +24,7 @@ public class CurrentUserTests
         var ctx = new DefaultHttpContext();
         if (principal is not null) ctx.User = principal;
         var accessor = new HttpContextAccessor { HttpContext = ctx };
-        return new CurrentUser(accessor, new UserProvisioning(_users.Object, _categories.Object),
+        return new CurrentUser(accessor, new UserProvisioning(_users.Object),
             cache ?? new MemoryCache(new MemoryCacheOptions()));
     }
 
@@ -46,13 +45,13 @@ public class CurrentUserTests
     public async Task UnknownTelegramId_ProvisionsUser()
     {
         _users.Setup(r => r.GetByTelegramIdAsync(777)).ReturnsAsync((User?)null);
-        _users.Setup(r => r.CreateAsync(It.Is<User>(u => u.TelegramId == 777 && u.DisplayName == "Новичок"))).ReturnsAsync(15UL);
-        _categories.Setup(r => r.CreateAsync(It.IsAny<Category>())).ReturnsAsync(1UL);
+        _users.Setup(r => r.CreateWithCategoriesAsync(It.Is<User>(u => u.TelegramId == 777 && u.DisplayName == "Новичок"), UserProvisioning.DefaultCategories))
+            .ReturnsAsync(15UL);
 
         var id = await Sut(Mvv42Principal(sub: "15000", tg: 777, name: "Новичок")).GetIdAsync();
 
         Assert.Equal(15UL, id);
-        _categories.Verify(r => r.CreateAsync(It.IsAny<Category>()), Times.Exactly(17));
+        _users.Verify(r => r.CreateWithCategoriesAsync(It.IsAny<User>(), It.IsAny<IReadOnlyList<CategorySeed>>()), Times.Once);
     }
 
     [Fact]

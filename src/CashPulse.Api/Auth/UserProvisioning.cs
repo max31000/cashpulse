@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using CashPulse.Core.Interfaces.Repositories;
 using CashPulse.Core.Models;
 using MySqlConnector;
@@ -6,21 +7,53 @@ namespace CashPulse.Api.Auth;
 
 /// <summary>
 /// The single place that creates local users. A mvv42 user is matched by Telegram id (the <c>tg</c> claim) only;
-/// a new user gets the default category tree (formerly the private AuthEndpoints.SeedCategoriesForUser).
+/// a new user is inserted together with the default category tree in one transaction
+/// (<see cref="IUserRepository.CreateWithCategoriesAsync"/>), so a user row never exists half-seeded.
 /// Existing rows — including the seeded <c>Id=1</c> user without a Telegram id — are never modified.
 /// </summary>
-public sealed class UserProvisioning(IUserRepository users, ICategoryRepository categoryRepo)
+public sealed class UserProvisioning(IUserRepository users)
 {
-    // One API instance: serialises the first-request burst of a new user (the SPA fires parallel API calls).
-    private static readonly SemaphoreSlim Gate = new(1, 1);
+    /// <summary>Default categories of a new user (formerly AuthEndpoints.SeedCategoriesForUser).</summary>
+    public static readonly IReadOnlyList<CategorySeed> DefaultCategories =
+    [
+        new("Доходы",
+        [
+            new("ЗП"),
+            new("Инвестиции (доход)"),
+            new("Прочие доходы"),
+        ]),
+        new("Расходы",
+        [
+            new("Ипотека"),
+            new("Кредитка (погашение)"),
+            new("Быт",
+            [
+                new("Продукты"),
+                new("Рестораны/Кафе"),
+                new("Подписки"),
+            ]),
+            new("Транспорт"),
+            new("Поездки"),
+            new("Ремонт"),
+            new("Здоровье/Медицина"),
+            new("Образование"),
+            new("Прочее"),
+        ]),
+    ];
 
-    /// <summary>Existing user with this Telegram id, or a new one with seeded categories.</summary>
+    // Per-Telegram-id gate: serialises the first-request burst of ONE new user (the SPA fires parallel calls) in
+    // this process without blocking other users. Across processes the unique TelegramId + 1062 handling decides.
+    // Entries are tiny and only created for users being provisioned; they are removed when the burst ends.
+    private static readonly ConcurrentDictionary<long, SemaphoreSlim> Gates = new();
+
+    /// <summary>Existing user with this Telegram id, or a new, fully seeded one.</summary>
     public async Task<User> GetOrCreateAsync(long telegramId, string displayName, CancellationToken ct = default)
     {
         if (await users.GetByTelegramIdAsync(telegramId) is { } existing)
             return existing;
 
-        await Gate.WaitAsync(ct);
+        var gate = Gates.GetOrAdd(telegramId, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(ct);
         try
         {
             if (await users.GetByTelegramIdAsync(telegramId) is { } created)
@@ -35,48 +68,27 @@ public sealed class UserProvisioning(IUserRepository users, ICategoryRepository 
             };
             try
             {
-                user.Id = await users.CreateAsync(user);
+                user.Id = await users.CreateWithCategoriesAsync(user, DefaultCategories);
+                return user;
             }
-            catch (MySqlException ex) when (ex.ErrorCode == MySqlErrorCode.DuplicateKeyEntry)
+            catch (Exception ex) when (IsDuplicateKey(ex))
             {
-                // Unique TelegramId: another instance created the row a moment ago (and seeded its categories).
+                // Another process committed this Telegram id a moment ago — together with its categories (same
+                // transaction), so the row we read back is complete.
                 return await users.GetByTelegramIdAsync(telegramId)
                        ?? throw new InvalidOperationException($"Users.TelegramId={telegramId}: duplicate key but no row", ex);
             }
-
-            await SeedCategoriesAsync(user.Id);
-            return user;
         }
         finally
         {
-            Gate.Release();
+            gate.Release();
+            if (gate.CurrentCount == 1)
+                Gates.TryRemove(new KeyValuePair<long, SemaphoreSlim>(telegramId, gate));
         }
     }
 
-    /// <summary>Default category tree of a new user (moved verbatim from AuthEndpoints.SeedCategoriesForUser).</summary>
-    internal async Task SeedCategoriesAsync(ulong userId)
-    {
-        // Корневые категории
-        var incomeId  = await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Доходы",  IsSystem = true, SortOrder = 0 });
-        var expenseId = await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Расходы", IsSystem = true, SortOrder = 1 });
-
-        // Доходы
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "ЗП",                   ParentId = incomeId,  IsSystem = true, SortOrder = 0 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Инвестиции (доход)",    ParentId = incomeId,  IsSystem = true, SortOrder = 1 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Прочие доходы",         ParentId = incomeId,  IsSystem = true, SortOrder = 2 });
-
-        // Расходы
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Ипотека",              ParentId = expenseId, IsSystem = true, SortOrder = 0 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Кредитка (погашение)",  ParentId = expenseId, IsSystem = true, SortOrder = 1 });
-        var bytId = await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Быт",       ParentId = expenseId, IsSystem = true, SortOrder = 2 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Продукты",              ParentId = bytId,     IsSystem = true, SortOrder = 0 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Рестораны/Кафе",        ParentId = bytId,     IsSystem = true, SortOrder = 1 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Подписки",              ParentId = bytId,     IsSystem = true, SortOrder = 2 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Транспорт",             ParentId = expenseId, IsSystem = true, SortOrder = 3 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Поездки",               ParentId = expenseId, IsSystem = true, SortOrder = 4 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Ремонт",                ParentId = expenseId, IsSystem = true, SortOrder = 5 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Здоровье/Медицина",     ParentId = expenseId, IsSystem = true, SortOrder = 6 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Образование",           ParentId = expenseId, IsSystem = true, SortOrder = 7 });
-        await categoryRepo.CreateAsync(new Category { UserId = userId, Name = "Прочее",                ParentId = expenseId, IsSystem = true, SortOrder = 8 });
-    }
+    /// <summary>MySQL 1062 (unique TelegramId), possibly wrapped.</summary>
+    internal static bool IsDuplicateKey(Exception ex) =>
+        ex is MySqlException { ErrorCode: MySqlErrorCode.DuplicateKeyEntry }
+        || (ex.InnerException is { } inner && IsDuplicateKey(inner));
 }

@@ -114,23 +114,57 @@ jobs:
           envs: DB_CONNECTION_STRING,IMAGE
           script: |
             set -e
+            REPO="${IMAGE%:*}"
+            # 1. JWKS of mvv42-auth must be reachable on the docker network, or every request would 401.
+            docker run --rm --network cashpulse-network curlimages/curl:8.10.1 -sf --max-time 10 \
+              http://mvv42-auth:8080/auth/.well-known/jwks.json > /dev/null \
+              || { echo "JWKS http://mvv42-auth:8080 not reachable from cashpulse-network - refusing to deploy"; exit 1; }
+
             docker pull "$IMAGE"
-            docker stop cashpulse-api && docker rm cashpulse-api || true
-            docker run -d \
-              --name cashpulse-api \
-              --network cashpulse-network \
-              --restart unless-stopped \
-              --label com.centurylinklabs.watchtower.enable=false \
-              -p 127.0.0.1:5000:5000 \
-              -e "ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}" \
-              "$IMAGE"
-            for i in $(seq 1 20); do
-              curl -sf http://localhost:5000/health > /dev/null && break
-              [ "$i" = 20 ] && { echo "Health check failed"; docker logs --tail 50 cashpulse-api; exit 1; }
-              sleep 2
-            done
+            # 2. Remember what runs now, for the rollback (empty on the first deploy).
+            OLD="$(docker inspect -f '{{.Config.Image}}' cashpulse-api 2>/dev/null || true)"
+            echo "previous image: ${OLD:-<none>}"
+
+            start() {
+              docker stop cashpulse-api > /dev/null 2>&1 || true
+              docker rm cashpulse-api > /dev/null 2>&1 || true
+              docker run -d \
+                --name cashpulse-api \
+                --network cashpulse-network \
+                --restart unless-stopped \
+                --label com.centurylinklabs.watchtower.enable=false \
+                -p 127.0.0.1:5000:5000 \
+                -e "ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}" \
+                "$1" > /dev/null
+            }
+            healthy() {
+              for i in $(seq 1 20); do
+                curl -sf http://localhost:5000/health > /dev/null && return 0
+                sleep 2
+              done
+              return 1
+            }
+
+            start "$IMAGE"
+            if ! healthy; then
+              echo "Health check failed on $IMAGE"
+              docker logs --tail 50 cashpulse-api || true
+              if [ -n "$OLD" ] && [ "$OLD" != "$IMAGE" ]; then
+                echo "Rolling back to $OLD"
+                start "$OLD"
+                healthy && echo "Rolled back to $OLD (healthy)" || echo "Rollback to $OLD is NOT healthy either"
+              else
+                echo "No previous image to roll back to"
+              fi
+              exit 1
+            fi
             echo "cashpulse-api healthy on $IMAGE"
-            docker image prune -f
+
+            # 3. Keep only the current and the previous image of this repo.
+            docker images "$REPO" --format '{{.Repository}}:{{.Tag}}' | while read -r img; do
+              [ "$img" = "$IMAGE" ] || [ "$img" = "$OLD" ] || docker rmi "$img" > /dev/null 2>&1 || true
+            done
+            docker image prune -f > /dev/null
 
       - name: Notify on failure
         if: failure()

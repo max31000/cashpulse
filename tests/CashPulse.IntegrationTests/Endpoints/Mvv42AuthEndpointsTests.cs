@@ -88,4 +88,50 @@ public class Mvv42AuthEndpointsTests
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
+
+    [Fact]
+    public async Task LegacyRowWithoutTelegramId_IsUntouched_NewTelegramUserGetsANewId()
+    {
+        // Mirrors production row id=1 (email user, no Telegram id): a new mvv42 user must never be mapped onto it.
+        await using var conn = new MySqlConnection(_factory.Database.ConnectionString);
+        await conn.ExecuteAsync(@"INSERT INTO Users (Id, TelegramId, Email, DisplayName, BaseCurrency)
+            VALUES (500, NULL, 'dev@local', 'Dev User', 'RUB') ON DUPLICATE KEY UPDATE Email = Email");
+        const long telegramId = 5_550_002;
+
+        var client = _factory.CreateClientWithToken(Mvv42TestAuth.CreateToken(telegramId, sub: "500", name: "Новый"));
+        (await client.GetAsync("/api/accounts")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var legacy = await conn.QuerySingleAsync<(long? TelegramId, string DisplayName, string Email)>(
+            "SELECT TelegramId, DisplayName, Email FROM Users WHERE Id = 500");
+        legacy.TelegramId.Should().BeNull();
+        legacy.DisplayName.Should().Be("Dev User");
+        legacy.Email.Should().Be("dev@local");
+        (await conn.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM Categories WHERE UserId = 500")).Should().Be(0);
+
+        var newId = await conn.ExecuteScalarAsync<ulong>("SELECT Id FROM Users WHERE TelegramId = @telegramId", new { telegramId });
+        newId.Should().NotBe(500UL);
+        (await conn.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM Categories WHERE UserId = @newId", new { newId })).Should().Be(17);
+    }
+
+    [Fact]
+    public async Task CreateWithCategories_IsAtomic_OnDuplicateTelegramId()
+    {
+        // A second insert of the same Telegram id fails with 1062 and leaves no orphan categories behind.
+        const long telegramId = 5_550_003;
+        var repo = new CashPulse.Infrastructure.Repositories.UserRepository(_factory.Database.ConnectionString);
+        var first = await repo.CreateWithCategoriesAsync(
+            new CashPulse.Core.Models.User { TelegramId = telegramId, DisplayName = "A", BaseCurrency = "RUB" },
+            CashPulse.Api.Auth.UserProvisioning.DefaultCategories);
+
+        await using var conn = new MySqlConnection(_factory.Database.ConnectionString);
+        var before = await conn.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM Categories");
+
+        var act = () => repo.CreateWithCategoriesAsync(
+            new CashPulse.Core.Models.User { TelegramId = telegramId, DisplayName = "B", BaseCurrency = "RUB" },
+            CashPulse.Api.Auth.UserProvisioning.DefaultCategories);
+        (await act.Should().ThrowAsync<MySqlException>()).Which.ErrorCode.Should().Be(MySqlErrorCode.DuplicateKeyEntry);
+
+        (await conn.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM Categories")).Should().Be(before);
+        (await conn.ExecuteScalarAsync<long>("SELECT COUNT(*) FROM Categories WHERE UserId = @first", new { first })).Should().Be(17);
+    }
 }
