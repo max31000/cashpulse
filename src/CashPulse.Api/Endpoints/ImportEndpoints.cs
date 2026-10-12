@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using System.Globalization;
 using System.Text;
 using CashPulse.Api.Middleware;
@@ -16,9 +17,9 @@ public static class ImportEndpoints
         group.MapPost("/csv", ImportCsv);
     }
 
-    private static async Task<IResult> PreviewCsv(HttpRequest request, HttpContext ctx)
+    private static async Task<IResult> PreviewCsv(HttpRequest request, ICurrentUser currentUser)
     {
-        var _userId = (ulong)ctx.Items["UserId"]!; // явная привязка к авторизованному пользователю
+        _ = await currentUser.GetIdAsync(); // провижининг пользователя до разбора файла
 
         if (!request.HasFormContentType)
             throw new ValidationException("Request must be multipart/form-data");
@@ -60,13 +61,13 @@ public static class ImportEndpoints
 
     private static async Task<IResult> ImportCsv(
         HttpRequest request,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IOperationRepository opRepo,
         ICategoryRepository catRepo,
         ICsvImportRepository importRepo,
         IAccountRepository accountRepo)
     {
-        var userId = (ulong)ctx.Items["UserId"]!;
+        var userId = await currentUser.GetIdAsync();
 
         if (!request.HasFormContentType)
             throw new ValidationException("Request must be multipart/form-data");

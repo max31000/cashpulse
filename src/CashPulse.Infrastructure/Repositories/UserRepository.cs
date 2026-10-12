@@ -49,6 +49,39 @@ public class UserRepository : IUserRepository
         return id;
     }
 
+    public async Task<ulong> CreateWithCategoriesAsync(User user, IReadOnlyList<CategorySeed> categories)
+    {
+        await using var conn = new MySqlConnection(_connectionString);
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+
+        var userId = await conn.ExecuteScalarAsync<ulong>(
+            @"INSERT INTO Users (TelegramId, Email, DisplayName, BaseCurrency)
+              VALUES (@TelegramId, @Email, @DisplayName, @BaseCurrency);
+              SELECT LAST_INSERT_ID();",
+            new { user.TelegramId, user.Email, user.DisplayName, user.BaseCurrency },
+            tx);
+
+        async Task InsertAsync(IReadOnlyList<CategorySeed> seeds, ulong? parentId)
+        {
+            for (var i = 0; i < seeds.Count; i++)
+            {
+                var id = await conn.ExecuteScalarAsync<ulong>(
+                    @"INSERT INTO Categories (UserId, Name, ParentId, IsSystem, SortOrder)
+                      VALUES (@UserId, @Name, @ParentId, 1, @SortOrder);
+                      SELECT LAST_INSERT_ID();",
+                    new { UserId = userId, seeds[i].Name, ParentId = parentId, SortOrder = i },
+                    tx);
+                if (seeds[i].Children is { Count: > 0 } children)
+                    await InsertAsync(children, id);
+            }
+        }
+
+        await InsertAsync(categories, null);
+        await tx.CommitAsync();
+        return userId;
+    }
+
     public async Task UpdateAsync(User user)
     {
         using var conn = CreateConnection();

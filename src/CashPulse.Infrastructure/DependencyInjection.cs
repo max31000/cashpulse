@@ -7,9 +7,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-// Регистрация IConfiguration как scoped-зависимости для TelegramAuthService
-// (IConfiguration уже является singleton, но нам нужно резолвить его через DI)
-
 namespace CashPulse.Infrastructure;
 
 public static class DependencyInjection
@@ -38,9 +35,6 @@ public static class DependencyInjection
         services.AddScoped<IExchangeRateRepository>(sp => new ExchangeRateRepository(GetConnStr(sp)));
         services.AddScoped<IBalanceSnapshotRepository>(sp => new BalanceSnapshotRepository(GetConnStr(sp)));
         services.AddScoped<ICsvImportRepository>(sp => new CsvImportRepository(GetConnStr(sp)));
-
-        // Auth services
-        services.AddScoped<ITelegramAuthService, TelegramAuthService>();
 
         // Income sources
         services.AddScoped<IIncomeSourceRepository>(sp => new IncomeSourceRepository(GetConnStr(sp)));

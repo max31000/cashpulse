@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Api.Middleware;
 using CashPulse.Core.Interfaces.Repositories;
 using CashPulse.Core.Models;
@@ -20,7 +21,7 @@ public static class OperationsEndpoints
     }
 
     private static async Task<IResult> GetOperations(
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IOperationRepository repo,
         DateOnly? from = null,
         DateOnly? to = null,
@@ -32,7 +33,7 @@ public static class OperationsEndpoints
         int offset = 0,
         int limit = 50)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var filter = new OperationFilter
         {
             From = from,
@@ -50,16 +51,16 @@ public static class OperationsEndpoints
         return Results.Ok(ops);
     }
 
-    private static async Task<IResult> GetRecurringOperations(HttpContext ctx, IOperationRepository repo)
+    private static async Task<IResult> GetRecurringOperations(ICurrentUser currentUser, IOperationRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var ops = await repo.GetRecurringAsync(userId);
         return Results.Ok(ops);
     }
 
-    private static async Task<IResult> GetOperation(long id, HttpContext ctx, IOperationRepository repo)
+    private static async Task<IResult> GetOperation(long id, ICurrentUser currentUser, IOperationRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var op = await repo.GetByIdAsync((ulong)id, userId);
         if (op == null) throw new NotFoundException($"Operation {id} not found");
         return Results.Ok(op);
@@ -67,11 +68,11 @@ public static class OperationsEndpoints
 
     private static async Task<IResult> CreateOperation(
         OperationCreateRequest req,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IOperationRepository repo,
         IAccountRepository accountRepo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
 
         var account = await accountRepo.GetByIdAsync((ulong)req.AccountId, userId)
             ?? throw new NotFoundException($"Account {req.AccountId} not found");
@@ -136,10 +137,10 @@ public static class OperationsEndpoints
     private static async Task<IResult> UpdateOperation(
         long id,
         OperationUpdateRequest req,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IOperationRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Operation {id} not found");
 
@@ -157,11 +158,11 @@ public static class OperationsEndpoints
 
     private static async Task<IResult> DeleteOperation(
         long id,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IOperationRepository repo,
         IAccountRepository accountRepo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Operation {id} not found");
 
@@ -183,11 +184,11 @@ public static class OperationsEndpoints
 
     private static async Task<IResult> ConfirmOperation(
         long id,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IOperationRepository repo,
         IAccountRepository accountRepo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Operation {id} not found");
 
@@ -232,7 +233,6 @@ public static class OperationsEndpoints
         };
     }
 
-    private static ulong GetUserId(HttpContext ctx) => (ulong)ctx.Items["UserId"]!;
 }
 
 public record OperationCreateRequest(

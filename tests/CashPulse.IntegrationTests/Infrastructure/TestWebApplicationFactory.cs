@@ -1,15 +1,19 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Mvv42.Auth.Client;
 using Xunit;
 
 namespace CashPulse.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// WebApplicationFactory that wires in a Testcontainers MySQL database
-/// and overrides JWT config to match JwtTestHelper.
+/// WebApplicationFactory that wires in a Testcontainers MySQL database and makes the mvv42 scheme trust the
+/// test signing key of <see cref="Mvv42TestAuth"/> (static configuration instead of the JWKS endpoint).
 /// </summary>
 public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -41,11 +45,6 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
                 // Override connection string to point at the test container
                 ["ConnectionStrings:DefaultConnection"] = _dbFixture.ConnectionString,
 
-                // Override JWT config to match JwtTestHelper tokens
-                ["Jwt:Secret"]   = JwtTestHelper.TestSecret,
-                ["Jwt:Issuer"]   = JwtTestHelper.TestIssuer,
-                ["Jwt:Audience"] = JwtTestHelper.TestAudience,
-
                 // Disable CBR exchange rate fetch during tests
                 ["ExchangeRates:CbrXmlUrl"] = "http://localhost:9999/does-not-exist",
                 ["ExchangeRates:RefreshIntervalHours"] = "99999",
@@ -62,19 +61,30 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
 
             foreach (var descriptor in hostedServiceDescriptors)
                 services.Remove(descriptor);
+
+            // Keys of the test "auth service" instead of http://mvv42-auth:8080/auth/.well-known/jwks.json
+            services.PostConfigure<JwtBearerOptions>(Mvv42Auth.Scheme, o =>
+                o.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(Mvv42TestAuth.Configuration()));
         });
     }
 
     /// <summary>
-    /// Creates an HttpClient with a valid JWT bearer token for the given userId.
-    /// UserId defaults to 1 (the seeded test user).
+    /// HttpClient signed in as the local user <paramref name="userId"/> (default 1, the seeded test user): an mvv42
+    /// access cookie whose <c>tg</c> is that user's Telegram id and whose <c>sub</c> is a different number.
+    /// Make sure the user row exists with that Telegram id (<see cref="DatabaseFixture.EnsureUserAsync"/>), otherwise
+    /// the API provisions a new user for it.
     /// </summary>
     public HttpClient CreateAuthenticatedClient(ulong userId = 1)
     {
+        var token = Mvv42TestAuth.CreateToken(
+            Mvv42TestAuth.TelegramIdFor(userId), Mvv42TestAuth.AuthSubFor(userId), $"User {userId}");
+        return CreateClientWithToken(token);
+    }
+
+    public HttpClient CreateClientWithToken(string token)
+    {
         var client = CreateClient();
-        var token = JwtTestHelper.GenerateToken(userId);
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        Mvv42TestAuth.Authenticate(client, token);
         return client;
     }
 }

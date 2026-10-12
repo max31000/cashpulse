@@ -1,79 +1,47 @@
-import { useAuthStore } from '../store/useAuthStore';
+import { apiJson, ApiError, requestLogin } from '@mvv42/kit/platform';
+import { useAccessStore } from '../store/useAccessStore';
 
-// В проде VITE_API_URL = https://mvv42.ru (nginx HTTPS на 443 → прокси /api/ на :5000)
-// В dev — http://localhost:5000
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
+/**
+ * API prefix, same origin as the page: `/cashpulse` → `/cashpulse/api/…` (nginx convention route; Vite proxies
+ * it in dev). Auth is the shared mvv42 cookie, so the API must never be called cross-origin.
+ */
+const API_BASE = import.meta.env.VITE_API_URL ?? '/cashpulse';
 
-function getAuthHeaders(): Record<string, string> {
-  const token = useAuthStore.getState().token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+export const SERVICE_ID = 'cashpulse';
+
+function url(path: string): string {
+  // Absolute against the page so the same code works in the browser and under jsdom (tests).
+  return new URL(`${API_BASE}${path}`, window.location.href).toString();
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-      ...(options?.headers ?? {}),
-    },
-  });
-
-  if (res.status === 401) {
-    // Токен истёк или невалиден — разлогиниваем
-    useAuthStore.getState().logout();
-    window.location.href = '/cashpulse/login';
-    throw new Error('Требуется авторизация');
+/**
+ * JSON (or multipart) request via the kit: cookies, one shared refresh on 401, `ApiError` on non-2xx.
+ * A final 401 sends the user to the shell login; a 403 (no access to cashpulse) switches the app to the
+ * «Нет доступа» screen. The error is re-thrown either way so callers can stop their spinners.
+ */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  try {
+    return await apiJson<T>(url(path), init);
+  } catch (e) {
+    if (e instanceof ApiError) {
+      if (e.status === 401) requestLogin(SERVICE_ID);
+      else if (e.status === 403 && e.code !== 'origin_not_allowed') useAccessStore.getState().deny(e);
+    }
+    throw e;
   }
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((error as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
 }
 
-async function requestMultipart<T>(path: string, formData: FormData): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: formData,
-  });
-
-  if (res.status === 401) {
-    useAuthStore.getState().logout();
-    window.location.href = '/cashpulse/login';
-    throw new Error('Требуется авторизация');
-  }
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((error as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
-}
+const json = (method: string, body?: unknown): RequestInit => ({
+  method,
+  body: body === undefined ? undefined : JSON.stringify(body),
+});
 
 export const apiClient = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
-    }),
-  put: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'PUT',
-      body: body ? JSON.stringify(body) : undefined,
-    }),
-  patch: <T>(path: string, body?: unknown) =>
-    request<T>(path, {
-      method: 'PATCH',
-      body: body ? JSON.stringify(body) : undefined,
-    }),
+  post: <T>(path: string, body?: unknown) => request<T>(path, json('POST', body)),
+  put: <T>(path: string, body?: unknown) => request<T>(path, json('PUT', body)),
+  patch: <T>(path: string, body?: unknown) => request<T>(path, json('PATCH', body)),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  postMultipart: <T>(path: string, formData: FormData) => requestMultipart<T>(path, formData),
+  /** FormData body: the browser sets the multipart boundary itself. */
+  postMultipart: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', body: formData }),
 };

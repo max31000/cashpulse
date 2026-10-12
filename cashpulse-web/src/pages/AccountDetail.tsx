@@ -1,32 +1,34 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import {
-  Stack, Group, Text, Badge, Button, Breadcrumbs, Anchor, Paper, SegmentedControl, Skeleton,
-  Divider
-} from '@mantine/core';
+import { Link, useParams } from 'react-router-dom';
+import { Badge, Button, Group, SegmentedControl, Skeleton, Text } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
+import { EmptyState, Metric, MetricGrid, Page, Section } from '@mvv42/kit';
+import { IconArrowLeft, IconArrowsExchange, IconPlus } from '@tabler/icons-react';
 import { useAccountStore } from '../store/useAccountStore';
 import { useOperationStore } from '../store/useOperationStore';
 import { useCategoryStore } from '../store/useCategoryStore';
 import { useScenarioStore } from '../store/useScenarioStore';
 import { OperationForm } from '../components/OperationForm/OperationForm';
+import { OperationList } from '../components/OperationList/OperationList';
+import { ListSkeleton } from '../components/RouterListRow';
 import { confirmOperation, deleteOperation } from '../api/operations';
-import { notifications } from '@mantine/notifications';
 import type { PlannedOperation } from '../api/types';
 import { formatMoney, formatMoneyWithSign } from '../utils/formatMoney';
-import { formatDateCompact, formatDateWithWeekday, getDateRange } from '../utils/formatDate';
-import { accountTypeColors, accountTypeLabels, tagColor } from '../utils/colors';
+import { getDateRange } from '../utils/formatDate';
+import { accountTypeColors, accountTypeLabels } from '../utils/colors';
+import { creditUsage, daysUntilDue } from '../utils/accounts';
 
 type PeriodValue = 'week' | 'month' | 'year';
 
+const PERIOD_LABEL: Record<PeriodValue, string> = { week: 'за неделю', month: 'за месяц', year: 'за год' };
+
 export default function AccountDetail() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { accounts, fetch: fetchAccounts } = useAccountStore();
+  const { accounts, loading: accLoading, fetch: fetchAccounts } = useAccountStore();
   const { operations, loading: opLoading, fetch: fetchOps } = useOperationStore();
   const { categories, fetch: fetchCategories } = useCategoryStore();
   const { scenarios, fetch: fetchScenarios } = useScenarioStore();
-
 
   const [period, setPeriod] = useState<PeriodValue>('month');
   const [formOpened, { open: openForm, close: closeForm }] = useDisclosure(false);
@@ -38,33 +40,40 @@ export default function AccountDetail() {
     void fetchAccounts();
     void fetchCategories();
     void fetchScenarios();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!id) return;
     const range = getDateRange(period);
     void fetchOps({ ...range, accountId: Number(id), limit: 200 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, period]);
+
+  const back = (
+    <Button component={Link} to="/accounts" variant="default" leftSection={<IconArrowLeft size={16} />}>
+      Все счета
+    </Button>
+  );
 
   if (!account) {
     return (
-      <Stack>
-        <Text c="dimmed">Счёт не найден</Text>
-        <Button onClick={() => navigate('/accounts')}>← Назад к счетам</Button>
-      </Stack>
+      <Page>
+        {accLoading || accounts.length === 0 ? (
+          <Skeleton h={160} />
+        ) : (
+          <EmptyState title="Счёт не найден" description="Возможно, он удалён или архивирован." action={back} />
+        )}
+      </Page>
     );
   }
 
   const mainBal = account.balances[0];
-  const today = new Date().toISOString().split('T')[0];
-
-  const grouped = operations.reduce<Record<string, PlannedOperation[]>>((acc, op) => {
-    const date = op.operationDate ?? op.createdAt.split('T')[0];
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(op);
-    return acc;
-  }, {});
-  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  const income = operations.filter((o) => o.amount > 0 && o.currency === mainBal?.currency).reduce((s, o) => s + o.amount, 0);
+  const expense = operations.filter((o) => o.amount < 0 && o.currency === mainBal?.currency).reduce((s, o) => s + o.amount, 0);
+  const planned = operations.filter((o) => !o.isConfirmed).length;
+  const usage = creditUsage(account);
+  const daysLeft = daysUntilDue(account);
 
   const handleConfirm = async (opId: number) => {
     try {
@@ -91,31 +100,55 @@ export default function AccountDetail() {
     }
   };
 
+  const currency = mainBal?.currency ?? 'RUB';
+
   return (
-    <Stack gap="md">
-      <Breadcrumbs>
-        <Anchor onClick={() => navigate('/accounts')} fz="sm">Счета</Anchor>
-        <Text fz="sm">{account.name}</Text>
-      </Breadcrumbs>
-
-      <Paper p="lg" withBorder>
-        <Group justify="space-between" mb="md">
-          <div>
-            <Text fz="xl" fw={700}>{account.name}</Text>
-            <Badge color={accountTypeColors[account.type]}>{accountTypeLabels[account.type]}</Badge>
-          </div>
-          <Text fz="2xl" fw={700} c={mainBal?.amount < 0 ? 'red' : 'blue'}>
-            {mainBal ? formatMoney(mainBal.amount, mainBal.currency) : '—'}
-          </Text>
+    <Page
+      eyebrow={<Link to="/accounts" className="mvv-link">← Счета</Link>}
+      title={
+        <Group gap="sm" component="span">
+          {account.name}
+          <Badge color={accountTypeColors[account.type]} size="sm">
+            {accountTypeLabels[account.type]}
+          </Badge>
         </Group>
-        {account.balances.slice(1).map(b => (
-          <Text key={b.currency} fz="sm" c="dimmed">{formatMoney(b.amount, b.currency)}</Text>
-        ))}
-      </Paper>
+      }
+      width="wide"
+      actions={
+        <Button
+          leftSection={<IconPlus size={16} />}
+          onClick={() => {
+            setEditingOp(undefined);
+            openForm();
+          }}
+        >
+          Добавить операцию
+        </Button>
+      }
+    >
+      <MetricGrid>
+        <Metric
+          label="Баланс"
+          value={mainBal ? formatMoney(mainBal.amount, mainBal.currency) : '—'}
+          hint={account.balances.length > 1 ? account.balances.slice(1).map((b) => formatMoney(b.amount, b.currency)).join(' · ') : undefined}
+        />
+        <Metric label={`Поступления ${PERIOD_LABEL[period]}`} value={formatMoneyWithSign(income, currency)} loading={opLoading} />
+        <Metric label={`Списания ${PERIOD_LABEL[period]}`} value={formatMoneyWithSign(expense, currency)} loading={opLoading} />
+        {usage != null ? (
+          <Metric
+            label="Использование лимита"
+            value={`${usage.toFixed(0)}%`}
+            hint={daysLeft != null ? `до оплаты ${daysLeft} дн.` : undefined}
+          />
+        ) : (
+          <Metric label="Плановых операций" value={String(planned)} loading={opLoading} />
+        )}
+      </MetricGrid>
 
-      <Group justify="space-between">
-        <Text fw={600}>Операции по счёту</Text>
-        <Group>
+      <Section
+        title="Операции по счёту"
+        padding="none"
+        actions={
           <SegmentedControl
             size="xs"
             value={period}
@@ -126,60 +159,30 @@ export default function AccountDetail() {
               { label: 'Год', value: 'year' },
             ]}
           />
-          <Button size="xs" variant="filled" onClick={() => { setEditingOp(undefined); openForm(); }}>
-            + Добавить
-          </Button>
-        </Group>
-      </Group>
-
-      {opLoading ? (
-        <Stack gap="xs">
-          {[1,2,3,4,5].map(i => <Skeleton key={i} h={48} />)}
-        </Stack>
-      ) : operations.length === 0 ? (
-        <Text c="dimmed" ta="center" py="xl">Нет операций за выбранный период</Text>
-      ) : (
-        <Stack gap="sm">
-          {sortedDates.map((date) => (
-            <div key={date}>
-              <Divider label={<Text fz="xs" c="dimmed" tt="capitalize">{formatDateWithWeekday(date)}</Text>} labelPosition="left" mb="xs" />
-              <Stack gap={4}>
-                {grouped[date].map((op) => {
-                  const isFuture = op.operationDate ? op.operationDate > today : false;
-                  return (
-                    <Paper key={op.id} px="md" py="sm" radius="sm"
-                      style={{
-                        opacity: isFuture ? 0.75 : 1,
-                        borderLeft: `4px ${isFuture ? 'dashed' : 'solid'} ${op.isConfirmed ? '#22C55E' : '#3B82F6'}`,
-                      }}>
-                      <Group justify="space-between" wrap="nowrap">
-                        <Group gap="sm" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
-                          <Stack gap={2}>
-                            <Text fw={600} fz="sm">{op.description ?? `#${op.id}`}</Text>
-                            <Group gap={4}>
-                              {op.tags?.map(t => <Badge key={t} size="xs" variant="dot" color={tagColor(t)}>{t}</Badge>)}
-                              {op.recurrenceRuleId && <Text fz="xs" c="dimmed">🔁</Text>}
-                            </Group>
-                          </Stack>
-                        </Group>
-                        <Group gap="xs" wrap="nowrap" style={{ flexShrink: 0 }}>
-                          <Text fz="sm" fw={700} c={op.amount >= 0 ? 'green' : 'red'}>
-                            {formatMoneyWithSign(op.amount, op.currency)}
-                          </Text>
-                          <Text fz="xs" c="dimmed" w={45}>{op.operationDate ? formatDateCompact(op.operationDate) : '—'}</Text>
-                          <Button size="xs" variant="subtle" onClick={() => { setEditingOp(op); openForm(); }}>✏️</Button>
-                          <Button size="xs" variant="subtle" color="red" onClick={() => handleDelete(op.id)}>🗑️</Button>
-                          {!op.isConfirmed && <Button size="xs" variant="subtle" color="green" onClick={() => handleConfirm(op.id)}>✓</Button>}
-                        </Group>
-                      </Group>
-                    </Paper>
-                  );
-                })}
-              </Stack>
-            </div>
-          ))}
-        </Stack>
-      )}
+        }
+      >
+        {opLoading ? (
+          <ListSkeleton rows={4} height={24} />
+        ) : operations.length === 0 ? (
+          <EmptyState
+            compact
+            icon={<IconArrowsExchange size={22} />}
+            title="Нет операций за выбранный период"
+            description={<Text span fz="sm">Выберите период шире или добавьте операцию.</Text>}
+          />
+        ) : (
+          <OperationList
+            operations={operations}
+            categories={categories}
+            onEdit={(op) => {
+              setEditingOp(op);
+              openForm();
+            }}
+            onDelete={(op) => handleDelete(op.id)}
+            onConfirm={(op) => handleConfirm(op.id)}
+          />
+        )}
+      </Section>
 
       <OperationForm
         key={editingOp?.id ?? 'new'}
@@ -196,6 +199,6 @@ export default function AccountDetail() {
         initialValues={editingOp}
         fixedAccountId={account.id}
       />
-    </Stack>
+    </Page>
   );
 }

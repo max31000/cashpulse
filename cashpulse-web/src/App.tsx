@@ -1,9 +1,19 @@
-import { MantineProvider, ColorSchemeScript } from '@mantine/core';
-import { Notifications } from '@mantine/notifications';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { theme } from './theme';
-import { AppLayout } from './components/Layout/AppLayout';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import type { ReactNode } from 'react';
+import { BrowserRouter, Link, Route, Routes } from 'react-router-dom';
+import { Button } from '@mantine/core';
+import { EmptyState, ErrorState, LoginRequired, Mvv42Provider, Page } from '@mvv42/kit';
+import { AppLayout, type NavItem } from '@mvv42/kit/router';
+import {
+  IconActivity,
+  IconArrowsExchange,
+  IconBuildingBank,
+  IconCash,
+  IconGitBranch,
+  IconLayoutDashboard,
+  IconMapSearch,
+  IconSettings,
+  IconTag,
+} from '@tabler/icons-react';
 import Dashboard from './pages/Dashboard';
 import Operations from './pages/Operations';
 import Accounts from './pages/Accounts';
@@ -12,65 +22,85 @@ import Scenarios from './pages/Scenarios';
 import ScenarioDetail from './pages/ScenarioDetail';
 import Tags from './pages/Tags';
 import Settings from './pages/Settings';
-import Login from './pages/Login';
 import IncomeSources from './pages/IncomeSources';
-import { useSettingsStore } from './store/useSettingsStore';
-import { useShellSync } from './hooks/useShellSync';
+import { SERVICE_ID } from './api/client';
+import { useAccessStore } from './store/useAccessStore';
 
-import '@mantine/core/styles.css';
-import '@mantine/notifications/styles.css';
-import '@mantine/dates/styles.css';
-import '@mantine/dropzone/styles.css';
+const ICON = { size: 16, stroke: 1.75 } as const;
+
+const nav: NavItem[] = [
+  { label: 'Дашборд', to: '/', icon: <IconLayoutDashboard {...ICON} /> },
+  { label: 'Операции', to: '/operations', icon: <IconArrowsExchange {...ICON} />, end: false },
+  { label: 'Счета', to: '/accounts', icon: <IconBuildingBank {...ICON} />, end: false },
+  { label: 'Сценарии', to: '/scenarios', icon: <IconGitBranch {...ICON} />, end: false },
+  { label: 'Теги', to: '/tags', icon: <IconTag {...ICON} /> },
+  { label: 'Источники дохода', to: '/income-sources', icon: <IconCash {...ICON} /> },
+  { label: 'Настройки', to: '/settings', icon: <IconSettings {...ICON} /> },
+];
 
 function NotFound() {
   return (
-    <div style={{ textAlign: 'center', padding: '4rem' }}>
-      <div style={{ fontSize: '4rem' }}>🔍</div>
-      <h2>Страница не найдена</h2>
-      <Link to="/">← На главную</Link>
-    </div>
+    <Page>
+      <EmptyState
+        icon={<IconMapSearch size={22} />}
+        title="Страница не найдена"
+        description="Такого раздела в CashPulse нет."
+        action={
+          <Button component={Link} to="/" variant="default">
+            На дашборд
+          </Button>
+        }
+      />
+    </Page>
   );
 }
 
-/** Компонент внутри Router — может использовать хуки react-router-dom */
-function AppRoutes() {
-  useShellSync('cashpulse');
+/** The API answered 403: the account lost (or never had) access to CashPulse. */
+function AccessGate({ children }: { children: ReactNode }) {
+  const denied = useAccessStore((s) => s.denied);
+  if (!denied) return <>{children}</>;
+  return (
+    <Page>
+      <ErrorState
+        error={denied}
+        onRetry={() => {
+          useAccessStore.getState().reset();
+          window.location.reload();
+        }}
+      />
+    </Page>
+  );
+}
 
+export function AppRoutes() {
   return (
     <Routes>
-      {/* Публичный маршрут */}
-      <Route path="login" element={<Login />} />
-
-      {/* Защищённые маршруты */}
-      <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="operations" element={<Operations />} />
-          <Route path="accounts" element={<Accounts />} />
-          <Route path="accounts/:id" element={<AccountDetail />} />
-          <Route path="scenarios" element={<Scenarios />} />
-          <Route path="scenarios/:id" element={<ScenarioDetail />} />
-          <Route path="tags" element={<Tags />} />
-          <Route path="income-sources" element={<IncomeSources />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-      </Route>
-
+      <Route index element={<Dashboard />} />
+      <Route path="operations" element={<Operations />} />
+      <Route path="accounts" element={<Accounts />} />
+      <Route path="accounts/:id" element={<AccountDetail />} />
+      <Route path="scenarios" element={<Scenarios />} />
+      <Route path="scenarios/:id" element={<ScenarioDetail />} />
+      <Route path="tags" element={<Tags />} />
+      <Route path="income-sources" element={<IncomeSources />} />
+      <Route path="settings" element={<Settings />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
 
 export default function App() {
-  const { colorScheme } = useSettingsStore();
-
   return (
-    <MantineProvider theme={theme} defaultColorScheme={colorScheme}>
-      <ColorSchemeScript defaultColorScheme={colorScheme} />
-      <Notifications position="top-right" autoClose={5000} />
+    <Mvv42Provider serviceId={SERVICE_ID} accent="blue">
       <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <AppRoutes />
+        <AppLayout title="CashPulse" icon={<IconActivity size={16} stroke={2} />} nav={nav}>
+          <LoginRequired description="Планирование денег и прогноз баланса доступны после входа через Telegram.">
+            <AccessGate>
+              <AppRoutes />
+            </AccessGate>
+          </LoginRequired>
+        </AppLayout>
       </BrowserRouter>
-    </MantineProvider>
+    </Mvv42Provider>
   );
 }

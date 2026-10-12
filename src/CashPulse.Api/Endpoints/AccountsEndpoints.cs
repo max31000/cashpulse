@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Api.Middleware;
 using CashPulse.Core.Interfaces.Repositories;
 using CashPulse.Core.Models;
@@ -18,24 +19,24 @@ public static class AccountsEndpoints
         group.MapPut("/{id:long}/balances", UpdateBalances);
     }
 
-    private static async Task<IResult> GetAccounts(HttpContext ctx, IAccountRepository repo)
+    private static async Task<IResult> GetAccounts(ICurrentUser currentUser, IAccountRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var accounts = await repo.GetByUserIdAsync(userId);
         return Results.Ok(accounts);
     }
 
-    private static async Task<IResult> GetAccount(long id, HttpContext ctx, IAccountRepository repo)
+    private static async Task<IResult> GetAccount(long id, ICurrentUser currentUser, IAccountRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var account = await repo.GetByIdAsync((ulong)id, userId);
         if (account == null) throw new NotFoundException($"Account {id} not found");
         return Results.Ok(account);
     }
 
-    private static async Task<IResult> CreateAccount(AccountCreateRequest req, HttpContext ctx, IAccountRepository repo)
+    private static async Task<IResult> CreateAccount(AccountCreateRequest req, ICurrentUser currentUser, IAccountRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
 
         if (string.IsNullOrWhiteSpace(req.Name))
             throw new ValidationException("Name is required");
@@ -79,9 +80,9 @@ public static class AccountsEndpoints
         return Results.Created($"/api/accounts/{id}", created);
     }
 
-    private static async Task<IResult> UpdateAccount(long id, AccountUpdateRequest req, HttpContext ctx, IAccountRepository repo)
+    private static async Task<IResult> UpdateAccount(long id, AccountUpdateRequest req, ICurrentUser currentUser, IAccountRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var existing = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Account {id} not found");
 
@@ -106,17 +107,17 @@ public static class AccountsEndpoints
         return Results.Ok(existing);
     }
 
-    private static async Task<IResult> ArchiveAccount(long id, HttpContext ctx, IAccountRepository repo)
+    private static async Task<IResult> ArchiveAccount(long id, ICurrentUser currentUser, IAccountRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var success = await repo.ArchiveAsync((ulong)id, userId);
         if (!success) throw new NotFoundException($"Account {id} not found");
         return Results.NoContent();
     }
 
-    private static async Task<IResult> UpdateBalances(long id, List<BalanceUpdateItem> balances, HttpContext ctx, IAccountRepository repo)
+    private static async Task<IResult> UpdateBalances(long id, List<BalanceUpdateItem> balances, ICurrentUser currentUser, IAccountRepository repo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
         var account = await repo.GetByIdAsync((ulong)id, userId)
             ?? throw new NotFoundException($"Account {id} not found");
 
@@ -132,7 +133,6 @@ public static class AccountsEndpoints
         return Results.Ok(updated);
     }
 
-    private static ulong GetUserId(HttpContext ctx) => (ulong)ctx.Items["UserId"]!;
 }
 
 public record AccountCreateRequest(

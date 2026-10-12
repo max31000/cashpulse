@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import {
-  Stack, Text, Table, Badge, Modal, Skeleton, Group, Divider
-} from '@mantine/core';
+import { Badge, Divider, Group, Modal, Skeleton, Stack, Table, Text, UnstyledButton } from '@mantine/core';
+import { EmptyState, Page, Section } from '@mvv42/kit';
+import { IconTag } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { useTagStore } from '../store/useTagStore';
 import type { TagSummary } from '../api/types';
@@ -46,47 +46,37 @@ export default function Tags() {
     return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number);
   });
 
-  if (loading) {
-    return (
-      <Stack>
-        <Text fz="xl" fw={700}>Теги</Text>
-        {[1,2,3,4,5,6,7,8].map(i => <Skeleton key={i} h={40} />)}
-      </Stack>
-    );
-  }
+  const sortHeader = (key: SortKey, label: string, right?: boolean) => (
+    <Table.Th ta={right ? 'right' : undefined} aria-sort={sortKey === key && sortDir ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}>
+      <UnstyledButton className="cp-sort" onClick={() => handleSort(key)}>
+        {label}<span aria-hidden="true">{sortIndicator(key)}</span>
+      </UnstyledButton>
+    </Table.Th>
+  );
 
   return (
-    <Stack gap="md">
-      <Text fz="xl" fw={700}>Теги</Text>
-
-      {tags.length === 0 ? (
-        <Text c="dimmed" ta="center" py="xl">Тегов нет. Добавьте теги к операциям.</Text>
+    <Page title="Теги" description="Суммы по тегам операций: подтверждённые и запланированные">
+      <Section padding="none">
+      {loading ? (
+        <Stack p="md" gap="xs">{[1, 2, 3, 4].map(i => <Skeleton key={i} h={32} />)}</Stack>
+      ) : tags.length === 0 ? (
+        <EmptyState icon={<IconTag size={22} />} title="Тегов нет" description="Добавьте теги к операциям — здесь появятся итоги по ним." />
       ) : (
-        <Table striped highlightOnHover withTableBorder>
+        <Table>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('tag')}>
-                Тег{sortIndicator('tag')}
-              </Table.Th>
-              <Table.Th ta="right" style={{ cursor: 'pointer' }} onClick={() => handleSort('operationCount')}>
-                Операций{sortIndicator('operationCount')}
-              </Table.Th>
-              <Table.Th ta="right" style={{ cursor: 'pointer' }} onClick={() => handleSort('totalConfirmed')}>
-                Подтверждено{sortIndicator('totalConfirmed')}
-              </Table.Th>
-              <Table.Th ta="right" style={{ cursor: 'pointer' }} onClick={() => handleSort('totalPlanned')}>
-                Запланировано{sortIndicator('totalPlanned')}
-              </Table.Th>
-              <Table.Th ta="right" style={{ cursor: 'pointer' }} onClick={() => handleSort('total')}>
-                Итого{sortIndicator('total')}
-              </Table.Th>
+              {sortHeader('tag', 'Тег')}
+              {sortHeader('operationCount', 'Операций', true)}
+              {sortHeader('totalConfirmed', 'Подтверждено', true)}
+              {sortHeader('totalPlanned', 'Запланировано', true)}
+              {sortHeader('total', 'Итого', true)}
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {sorted.map((t) => (
               <Table.Tr
                 key={t.tag}
-                style={{ cursor: 'pointer' }}
+                className="cp-clickable"
                 onClick={() => { setSelectedTag(t); openDetail(); }}
               >
                 <Table.Td>
@@ -103,6 +93,7 @@ export default function Tags() {
           </Table.Tbody>
         </Table>
       )}
+      </Section>
 
       {selectedTag && (
         <Modal
@@ -123,6 +114,6 @@ export default function Tags() {
           </Stack>
         </Modal>
       )}
-    </Stack>
+    </Page>
   );
 }

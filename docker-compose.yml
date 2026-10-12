@@ -26,13 +26,20 @@ services:
       dockerfile: src/CashPulse.Api/Dockerfile
     container_name: cashpulse-api
     restart: unless-stopped
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
     ports:
       - "5000:5000"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_URLS: http://+:5000
       ConnectionStrings__DefaultConnection: "Server=mysql;Database=cashpulse;User=root;Password=${MYSQL_ROOT_PASSWORD:-cashpulse_dev};"
-      Jwt__Secret: ${JWT_SECRET:?JWT_SECRET required}
+      # Auth: shared mvv42-auth, no app secret. This stack does not run mvv42-auth: point the JWKS at one
+      # (default: a local `dotnet run` of mvv42-auth on the host, port 5010). Without it every API call is 401.
+      # Browser access must go through the Vite dev server (same origin, proxies /cashpulse/api and /auth).
+      Mvv42Auth__JwksUrl: ${MVV42_JWKS_URL:-http://host.docker.internal:5010/auth/.well-known/jwks.json}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       mysql:
         condition: service_healthy

@@ -14,6 +14,11 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.0" />
     <PackageReference Include="Moq" Version="4.20.70" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Shared test token minting (ES256 test key, mvv42 claims) -->
+    <Compile Include="..\CashPulse.IntegrationTests\Infrastructure\Mvv42TestAuth.cs" Link="Auth\Mvv42TestAuth.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\CashPulse.Core\CashPulse.Core.csproj" />

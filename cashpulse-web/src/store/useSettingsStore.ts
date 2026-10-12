@@ -1,34 +1,25 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+/**
+ * Local preferences. The colour scheme is no longer here: it is the site-wide `mvv42-color-scheme` setting owned
+ * by the shell / `AppLayout` (the kit migrates the old `cashpulse-settings.colorScheme` value once).
+ * The user's name comes from the mvv42 account (`useMe`).
+ */
 interface SettingsStore {
-  colorScheme: 'auto' | 'light' | 'dark';
   baseCurrency: string;
-  displayName: string;
-  email: string;
-  setColorScheme: (scheme: 'auto' | 'light' | 'dark') => void;
   setBaseCurrency: (currency: string) => void;
-  setDisplayName: (name: string) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      colorScheme: 'auto',
       baseCurrency: 'RUB',
-      displayName: 'Dev User',
-      email: 'dev@local',
-      setColorScheme: (colorScheme) => set({ colorScheme }),
       setBaseCurrency: (baseCurrency) => set({ baseCurrency }),
-      setDisplayName: (displayName) => set({ displayName }),
     }),
     {
       name: 'cashpulse-settings',
-      partialize: (state) => ({
-        colorScheme: state.colorScheme,
-        baseCurrency: state.baseCurrency,
-        displayName: state.displayName,
-      }),
+      partialize: (state) => ({ baseCurrency: state.baseCurrency }),
     }
   )
 );

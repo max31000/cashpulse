@@ -1,3 +1,4 @@
+using CashPulse.Api.Auth;
 using CashPulse.Api.Middleware;
 using CashPulse.Core.Interfaces.Repositories;
 using CashPulse.Core.Models;
@@ -16,11 +17,11 @@ public static class BalanceSnapshotsEndpoints
 
     private static async Task<IResult> CreateSnapshot(
         SnapshotCreateRequest req,
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IBalanceSnapshotRepository snapshotRepo,
         IAccountRepository accountRepo)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
 
         var account = await accountRepo.GetByIdAsync((ulong)req.AccountId, userId)
             ?? throw new NotFoundException($"Account {req.AccountId} not found");
@@ -56,12 +57,12 @@ public static class BalanceSnapshotsEndpoints
     }
 
     private static async Task<IResult> GetSnapshots(
-        HttpContext ctx,
+        ICurrentUser currentUser,
         IBalanceSnapshotRepository snapshotRepo,
         IAccountRepository accountRepo,
         long? accountId = null)
     {
-        var userId = GetUserId(ctx);
+        var userId = await currentUser.GetIdAsync();
 
         if (accountId.HasValue)
         {
@@ -84,7 +85,6 @@ public static class BalanceSnapshotsEndpoints
         return Results.Ok(allSnapshots.OrderByDescending(s => s.SnapshotDate).ThenByDescending(s => s.CreatedAt));
     }
 
-    private static ulong GetUserId(HttpContext ctx) => (ulong)ctx.Items["UserId"]!;
 }
 
 public record SnapshotCreateRequest(

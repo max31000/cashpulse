@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react';
 import {
-  Stack, Group, Button, Text, Card, Badge, Progress, SimpleGrid,
+  Stack, Group, Button, Text, Badge, Progress, SimpleGrid,
   Modal, TextInput, Select, NumberInput, Divider, ActionIcon, Skeleton, Switch
 } from '@mantine/core';
+import { EmptyState, ErrorState, Page, Section } from '@mvv42/kit';
+import { IconArchive, IconBuildingBank, IconPencil, IconPlus } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useAccountStore } from '../store/useAccountStore';
 import { createAccount, updateAccount, archiveAccount } from '../api/accounts';
 import type { Account, CreateAccountDto } from '../api/types';
 import { formatMoney } from '../utils/formatMoney';
 import { accountTypeColors, accountTypeLabels } from '../utils/colors';
+import { creditUsage, daysUntilDue, graceDaysLeft } from '../utils/accounts';
 
 interface BalanceEntry { currency: string; amount: number | '' }
 interface FormValues {
@@ -101,7 +104,7 @@ function AccountModal({ opened, onClose, onSave, initial }: {
   const removeBalance = (idx: number) => form.setFieldValue('balances', form.values.balances.filter((_, i) => i !== idx));
 
   return (
-    <Modal opened={opened} onClose={onClose} title={initial ? 'Редактировать счёт' : 'Новый счёт'} size="lg" closeOnClickOutside={false} overlayProps={{ blur: 3 }}>
+    <Modal opened={opened} onClose={onClose} title={initial ? 'Редактировать счёт' : 'Новый счёт'} size="lg" closeOnClickOutside={false}>
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <TextInput label="Название" required maxLength={255} placeholder="Например: Tinkoff Дебетовая" {...form.getInputProps('name')} />
@@ -117,13 +120,13 @@ function AccountModal({ opened, onClose, onSave, initial }: {
           {form.values.balances.map((_, idx) => (
             <Group key={idx} align="flex-end">
               <Select w={90} data={['RUB', 'USD', 'EUR', 'CNY', 'GBP']} {...form.getInputProps(`balances.${idx}.currency`)} />
-              <NumberInput style={{ flex: 1 }} thousandSeparator=" " decimalSeparator="," {...form.getInputProps(`balances.${idx}.amount`)} />
+              <NumberInput className="cp-grow" thousandSeparator=" " decimalSeparator="," {...form.getInputProps(`balances.${idx}.amount`)} />
               {form.values.balances.length > 1 && (
                 <ActionIcon color="red" variant="subtle" onClick={() => removeBalance(idx)}>×</ActionIcon>
               )}
             </Group>
           ))}
-          <Button variant="outline" size="xs" onClick={addBalance} style={{ borderStyle: 'dashed' }}>+ Добавить валюту</Button>
+          <Button variant="default" size="xs" onClick={addBalance} leftSection={<IconPlus size={14} />}>Добавить валюту</Button>
 
           {form.values.type === 'credit' && (
             <>
@@ -242,18 +245,87 @@ function AccountModal({ opened, onClose, onSave, initial }: {
   );
 }
 
+function AccountCard({ acc, onEdit, onArchive }: { acc: Account; onEdit: (a: Account) => void; onArchive: (a: Account) => void }) {
+  const mainBal = acc.balances[0];
+  const usedPct = creditUsage(acc);
+  const daysLeft = daysUntilDue(acc);
+  const graceLeft = graceDaysLeft(acc);
+
+  let details: string | null = null;
+  if (acc.type === 'deposit' && acc.interestRate) {
+    details = `${acc.interestRate}% годовых`
+      + (acc.depositEndDate ? ` · до ${new Date(acc.depositEndDate).toLocaleDateString('ru-RU')}` : '')
+      + (acc.dailyAccrual ? ' · ежедневное начисление' : acc.interestAccrualDay ? ` · начисление ${acc.interestAccrualDay}-го` : '');
+  } else if (acc.type === 'investment' && acc.investmentSubtype) {
+    details = (acc.investmentSubtype === 'savings' ? 'Сберегательный' : acc.investmentSubtype === 'bonds' ? 'Облигации' : 'Акции / фонды')
+      + (acc.investmentSubtype === 'savings' && acc.interestRate ? ` · ${acc.interestRate}%` : '');
+  }
+
+  return (
+    <div className="cp-account" data-archived={acc.isArchived || undefined}>
+      <div className="cp-account-head">
+        <Link to={`/accounts/${acc.id}`} className="cp-account-name cp-title-link cp-truncate">{acc.name}</Link>
+        <Group gap={6} wrap="nowrap">
+          {acc.isArchived && <Badge size="xs" color="gray">Архив</Badge>}
+          <Badge size="sm" color={accountTypeColors[acc.type]}>{accountTypeLabels[acc.type]}</Badge>
+        </Group>
+      </div>
+
+      <div className="cp-account-balance mvv-num cp-amount" data-sign={mainBal && mainBal.amount < 0 ? 'neg' : undefined}>
+        {mainBal ? formatMoney(mainBal.amount, mainBal.currency) : '—'}
+      </div>
+      {acc.balances.slice(1).map((b) => (
+        <Text key={b.currency} fz="sm" c="dimmed" className="mvv-num">{formatMoney(b.amount, b.currency)}</Text>
+      ))}
+
+      {usedPct != null && acc.creditLimit && (
+        <>
+          <Text fz="xs" c="dimmed" className="mvv-num">
+            Использовано {formatMoney(Math.abs(mainBal?.amount ?? 0), mainBal?.currency ?? 'RUB')} из {formatMoney(acc.creditLimit, 'RUB')}
+          </Text>
+          <Progress value={usedPct} color={usedPct > 80 ? 'red' : 'blue'} size="sm" aria-label="Использование лимита" />
+          {(daysLeft != null || acc.minPaymentPercent) && (
+            <Text fz="xs" c="dimmed">
+              {daysLeft != null && <Text span fz="xs" c={daysLeft <= 7 ? 'red' : 'dimmed'}>До оплаты {daysLeft} дн.</Text>}
+              {daysLeft != null && acc.minPaymentPercent ? ' · ' : ''}
+              {acc.minPaymentPercent ? `мин. платёж ${acc.minPaymentPercent}%` : ''}
+            </Text>
+          )}
+        </>
+      )}
+      {graceLeft != null && (
+        <Text fz="xs" c={graceLeft <= 7 ? 'red' : graceLeft <= 14 ? 'yellow' : 'dimmed'}>
+          Беспроцентный период: {graceLeft > 0 ? `ещё ${graceLeft} дн.` : 'истёк'}
+        </Text>
+      )}
+      {details && <Text fz="sm" c="dimmed">{details}</Text>}
+
+      <div className="cp-account-foot">
+        <Button component={Link} to={`/accounts/${acc.id}`} variant="subtle" size="xs">Операции</Button>
+        <Button variant="subtle" size="xs" color="gray" leftSection={<IconPencil size={14} />} onClick={() => onEdit(acc)}>
+          Изменить
+        </Button>
+        {!acc.isArchived && (
+          <Button variant="subtle" size="xs" color="gray" leftSection={<IconArchive size={14} />} onClick={() => onArchive(acc)} ml="auto">
+            В архив
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Accounts() {
-  const navigate = useNavigate();
-  const { accounts, loading, fetch: fetchAccounts, addAccount, updateAccount: updateStoreAccount, removeAccount } = useAccountStore();
+  const { accounts, loading, error, fetch: fetchAccounts, addAccount, updateAccount: updateStoreAccount, removeAccount } = useAccountStore();
   const [showArchived, setShowArchived] = useState(false);
   const [modalOpened, { open, close }] = useDisclosure(false);
   const [editingAcc, setEditingAcc] = useState<Account | undefined>();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void fetchAccounts(); }, []);
 
   const active = accounts.filter(a => !a.isArchived).sort((a, b) => a.sortOrder - b.sortOrder);
   const archived = accounts.filter(a => a.isArchived).sort((a, b) => a.sortOrder - b.sortOrder);
-  const hasArchived = archived.length > 0;
 
   const handleArchive = async (acc: Account) => {
     if (!confirm(`Архивировать счёт "${acc.name}"?`)) return;
@@ -266,138 +338,51 @@ export default function Accounts() {
     }
   };
 
-  const AccountCardEl = ({ acc }: { acc: Account }) => {
-    const mainBal = acc.balances[0];
-    const otherBals = acc.balances.slice(1);
-    const usedPct = acc.type === 'credit' && acc.creditLimit && mainBal
-      ? (Math.abs(mainBal.amount) / acc.creditLimit) * 100 : 0;
-    const dueDay = acc.dueDay;
-    let daysLeft = 0;
-    if (dueDay) {
-      const now = new Date();
-      const next = new Date(now.getFullYear(), now.getMonth(), dueDay);
-      if (next < now) next.setMonth(next.getMonth() + 1);
-      daysLeft = Math.ceil((next.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    }
-
-    return (
-      <Card p="lg" radius="md" withBorder shadow="sm" style={{ cursor: 'pointer', opacity: acc.isArchived ? 0.6 : 1 }}
-        onClick={() => navigate(`/accounts/${acc.id}`)}>
-        <Card.Section withBorder inheritPadding py="xs">
-          <Group justify="space-between">
-            <Text fw={700} fz="lg">{acc.name}</Text>
-            <Group gap="xs">
-              {acc.isArchived && <Badge size="xs" color="gray">Архивирован</Badge>}
-              <Badge size="sm" color={accountTypeColors[acc.type]}>{accountTypeLabels[acc.type]}</Badge>
-            </Group>
-          </Group>
-        </Card.Section>
-
-        <Stack gap={4} mt="md">
-          <Text fz="xl" fw={700} c={mainBal?.amount < 0 ? 'red' : undefined}>
-            {mainBal ? formatMoney(mainBal.amount, mainBal.currency) : '—'}
-          </Text>
-          {otherBals.map(b => <Text key={b.currency} fz="sm" c="dimmed">{formatMoney(b.amount, b.currency)}</Text>)}
-        </Stack>
-
-        {acc.type === 'credit' && acc.creditLimit && (
-          <>
-            <Divider my="sm" />
-            <Text fz="xs" c="dimmed">Использовано: {formatMoney(Math.abs(mainBal?.amount ?? 0), mainBal?.currency ?? 'RUB')} / Лимит: {formatMoney(acc.creditLimit, 'RUB')}</Text>
-            <Progress value={usedPct} color={usedPct > 80 ? 'red' : 'blue'} size="md" radius="xl" mt="xs" />
-            {dueDay && <Text fz="xs" c={daysLeft <= 7 ? 'red' : 'dimmed'} mt={4}>До оплаты: {daysLeft} дней</Text>}
-            {acc.minPaymentPercent && <Text fz="xs" c="dimmed">Мин. платёж: {acc.minPaymentPercent}%</Text>}
-          </>
-        )}
-
-        {acc.type === 'credit' && acc.gracePeriodEndDate && (
-          (() => {
-            const graceLeft = Math.round(
-              (new Date(acc.gracePeriodEndDate).getTime() - Date.now()) / 86400000
-            );
-            return (
-              <Text size="sm" c={graceLeft <= 7 ? 'red' : graceLeft <= 14 ? 'yellow' : 'dimmed'}>
-                Беспроцентный период: {graceLeft > 0 ? `ещё ${graceLeft} дн.` : 'истёк'}
-              </Text>
-            );
-          })()
-        )}
-
-        {acc.type === 'deposit' && acc.interestRate && (
-          <Text size="sm" c="dimmed">
-            {acc.interestRate}% годовых
-            {acc.depositEndDate && ` · до ${new Date(acc.depositEndDate).toLocaleDateString('ru-RU')}`}
-            {acc.dailyAccrual ? ' · ежедневное начисление' : acc.interestAccrualDay ? ` · начисление ${acc.interestAccrualDay}-го` : ''}
-          </Text>
-        )}
-
-        {acc.type === 'investment' && acc.investmentSubtype && (
-          <Text size="sm" c="dimmed">
-            {acc.investmentSubtype === 'savings' ? 'Сберегательный' :
-             acc.investmentSubtype === 'bonds' ? 'Облигации' : 'Акции / фонды'}
-            {acc.investmentSubtype === 'savings' && acc.interestRate && ` · ${acc.interestRate}%`}
-          </Text>
-        )}
-
-        <Card.Section withBorder inheritPadding pt="sm" mt="md">
-          <Group justify="space-between">
-            <Button variant="subtle" size="xs" onClick={(e) => { e.stopPropagation(); setEditingAcc(acc); open(); }}>
-              ✏️ Редактировать
-            </Button>
-            {acc.isArchived ? (
-              <Button variant="subtle" size="xs" color="blue" onClick={(e) => { e.stopPropagation(); /* TODO: unarchive */ }}>
-                ↺ Разархивировать
-              </Button>
-            ) : (
-              <Button variant="subtle" size="xs" color="gray" onClick={(e) => { e.stopPropagation(); handleArchive(acc); }}>
-                🗄 Архивировать
-              </Button>
-            )}
-          </Group>
-        </Card.Section>
-      </Card>
-    );
-  };
+  const openNew = () => { setEditingAcc(undefined); open(); };
+  const onEdit = (acc: Account) => { setEditingAcc(acc); open(); };
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between">
-        <Text fz="xl" fw={700}>Счета</Text>
-        <Button variant="filled" onClick={() => { setEditingAcc(undefined); open(); }}>+ Добавить счёт</Button>
-      </Group>
-      {hasArchived && (
-        <Button variant="subtle" size="xs" onClick={() => setShowArchived(!showArchived)}>
-          {showArchived ? 'Скрыть архивированные' : 'Показать архивированные'}
-        </Button>
-      )}
-
+    <Page
+      title="Счета"
+      description="Карты, вклады, наличные и инвестиции"
+      width="wide"
+      actions={
+        <>
+          {archived.length > 0 && (
+            <Button variant="default" onClick={() => setShowArchived(!showArchived)}>
+              {showArchived ? 'Скрыть архив' : `Архив (${archived.length})`}
+            </Button>
+          )}
+          <Button leftSection={<IconPlus size={16} />} onClick={openNew}>Добавить счёт</Button>
+        </>
+      }
+    >
       {loading ? (
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-          {[1,2,3,4].map(i => <Skeleton key={i} h={200} />)}
+          {[1, 2, 3].map(i => <Skeleton key={i} h={180} radius="md" />)}
         </SimpleGrid>
+      ) : error && accounts.length === 0 ? (
+        <Section><ErrorState error={error} onRetry={() => void fetchAccounts()} /></Section>
+      ) : active.length === 0 && !showArchived ? (
+        <Section>
+          <EmptyState
+            icon={<IconBuildingBank size={22} />}
+            title="Нет счетов"
+            description="Добавьте первый счёт — с него начинаются баланс и прогноз."
+            action={<Button onClick={openNew}>Добавить счёт</Button>}
+          />
+        </Section>
       ) : (
-        <>
-          {active.length === 0 && !showArchived ? (
-            <Stack align="center" py="xl">
-              <Text fz="4xl">🏦</Text>
-              <Text fw={600}>Нет счетов</Text>
-              <Text c="dimmed" fz="sm">Добавьте первый счёт для начала работы</Text>
-              <Button onClick={() => { setEditingAcc(undefined); open(); }}>Добавить счёт</Button>
-            </Stack>
-          ) : (
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-              {active.map(acc => <AccountCardEl key={acc.id} acc={acc} />)}
-            </SimpleGrid>
-          )}
-          {showArchived && archived.length > 0 && (
-            <>
-              <Divider label="Архив" />
-              <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
-                {archived.map(acc => <AccountCardEl key={acc.id} acc={acc} />)}
-              </SimpleGrid>
-            </>
-          )}
-        </>
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+          {active.map(acc => <AccountCard key={acc.id} acc={acc} onEdit={onEdit} onArchive={handleArchive} />)}
+        </SimpleGrid>
+      )}
+      {showArchived && archived.length > 0 && (
+        <Section title="Архив" variant="plain">
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
+            {archived.map(acc => <AccountCard key={acc.id} acc={acc} onEdit={onEdit} onArchive={handleArchive} />)}
+          </SimpleGrid>
+        </Section>
       )}
 
       <AccountModal
@@ -410,6 +395,6 @@ export default function Accounts() {
         }}
         initial={editingAcc}
       />
-    </Stack>
+    </Page>
   );
 }

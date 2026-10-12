@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import {
-  Stack, Group, Button, Text, Card, Switch, Textarea, TextInput,
-  Modal, Divider, Skeleton, Center
-} from '@mantine/core';
+import { Badge, Button, Group, Modal, Skeleton, Stack, Switch, Textarea, TextInput } from '@mantine/core';
+import { EmptyState, Page, Section } from '@mvv42/kit';
+import { IconGitBranch, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
 import { useScenarioStore } from '../store/useScenarioStore';
 import { createScenario, updateScenario, deleteScenario, toggleScenario } from '../api/scenarios';
@@ -45,7 +44,7 @@ function ScenarioModal({ opened, onClose, onSave, initial }: {
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title={initial ? 'Редактировать сценарий' : 'Новый сценарий'} size="sm" closeOnClickOutside={false} overlayProps={{ blur: 3 }}>
+    <Modal opened={opened} onClose={onClose} title={initial ? 'Редактировать сценарий' : 'Новый сценарий'} size="sm" closeOnClickOutside={false}>
       <form onSubmit={form.onSubmit(handleSubmit)}>
         <Stack gap="md">
           <TextInput label="Название" required maxLength={255} {...form.getInputProps('name')} />
@@ -62,7 +61,6 @@ function ScenarioModal({ opened, onClose, onSave, initial }: {
 }
 
 export default function Scenarios() {
-  const navigate = useNavigate();
   const { scenarios, loading, fetch: fetchScenarios, addScenario, updateScenario: updateStore, removeScenario } = useScenarioStore();
   const [modalOpened, { open, close }] = useDisclosure(false);
   const [editing, setEditing] = useState<Scenario | undefined>();
@@ -89,57 +87,54 @@ export default function Scenarios() {
     }
   };
 
-  if (loading) {
-    return (
-      <Stack>
-        <Group justify="space-between"><Text fz="xl" fw={700}>Сценарии</Text></Group>
-        {[1,2,3].map(i => <Skeleton key={i} h={160} />)}
-      </Stack>
-    );
-  }
+  const openNew = () => {
+    setEditing(undefined);
+    open();
+  };
 
   return (
-    <Stack gap="md">
-      <Group justify="space-between">
-        <Text fz="xl" fw={700}>Сценарии</Text>
-        <Button variant="filled" onClick={() => { setEditing(undefined); open(); }}>+ Новый сценарий</Button>
-      </Group>
-
-      {scenarios.length === 0 ? (
-        <Center h={300}>
-          <Stack align="center" gap="md">
-            <Text fz="4xl">🔮</Text>
-            <Text fw={600} fz="lg">Нет сценариев</Text>
-            <Text c="dimmed" fz="sm">Создайте сценарий, чтобы сравнить варианты развития событий</Text>
-            <Button onClick={() => { setEditing(undefined); open(); }}>+ Новый сценарий</Button>
-          </Stack>
-        </Center>
-      ) : (
+    <Page
+      title="Сценарии"
+      description="«Что если»: гипотетические доходы и расходы, которые можно включать в прогноз"
+      actions={<Button leftSection={<IconPlus size={16} />} onClick={openNew}>Новый сценарий</Button>}
+    >
+      {loading ? (
         <Stack gap="md">
-          {scenarios.map((s) => (
-            <Card key={s.id} p="lg" radius="md" withBorder shadow="sm">
-              <Group justify="space-between" mb="sm">
-                <Text fw={700} fz="lg">{s.name}</Text>
-                <Switch
-                  label="Активен"
-                  checked={s.isActive}
-                  onChange={() => handleToggle(s)}
-                />
-              </Group>
-              {s.description && (
-                <Text fz="sm" c="dimmed" lineClamp={3} mb="sm">{s.description}</Text>
-              )}
-              <Divider mb="sm" />
-              <Card.Section withBorder inheritPadding pt="sm">
-                <Group gap="xs">
-                  <Button variant="subtle" size="xs" onClick={() => { setEditing(s); open(); }}>Редактировать</Button>
-                  <Button variant="light" size="xs" onClick={() => navigate(`/scenarios/${s.id}`)}>Открыть</Button>
-                  <Button variant="subtle" color="red" size="xs" onClick={() => handleDelete(s)}>Удалить</Button>
-                </Group>
-              </Card.Section>
-            </Card>
-          ))}
+          {[1, 2].map((i) => <Skeleton key={i} h={120} />)}
         </Stack>
+      ) : scenarios.length === 0 ? (
+        <Section>
+          <EmptyState
+            icon={<IconGitBranch size={22} />}
+            title="Нет сценариев"
+            description="Создайте сценарий, чтобы сравнить варианты развития событий."
+            action={<Button onClick={openNew}>Новый сценарий</Button>}
+          />
+        </Section>
+      ) : (
+        scenarios.map((s) => (
+          <Section
+            key={s.id}
+            title={
+              <Group gap="xs" component="span">
+                <Link to={`/scenarios/${s.id}`} className="cp-title-link">{s.name}</Link>
+                {s.isActive && <Badge size="sm" color="green">Активен</Badge>}
+              </Group>
+            }
+            description={s.description || undefined}
+            actions={<Switch aria-label={`Сценарий «${s.name}» активен`} checked={s.isActive} onChange={() => handleToggle(s)} />}
+          >
+            <Group gap="xs">
+              <Button component={Link} to={`/scenarios/${s.id}`} variant="light" size="xs">Открыть</Button>
+              <Button variant="subtle" size="xs" leftSection={<IconPencil size={14} />} onClick={() => { setEditing(s); open(); }}>
+                Изменить
+              </Button>
+              <Button variant="subtle" color="red" size="xs" leftSection={<IconTrash size={14} />} onClick={() => handleDelete(s)}>
+                Удалить
+              </Button>
+            </Group>
+          </Section>
+        ))
       )}
 
       <ScenarioModal
@@ -149,6 +144,6 @@ export default function Scenarios() {
         onSave={(s) => { if (editing) updateStore(s); else addScenario(s); }}
         initial={editing}
       />
-    </Stack>
+    </Page>
   );
 }

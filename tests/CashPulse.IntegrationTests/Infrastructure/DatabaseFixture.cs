@@ -66,6 +66,11 @@ public class DatabaseFixture : IAsyncLifetime
                 (2, 1, 'Сберегательный', 'debit', 0, 1)
             ON DUPLICATE KEY UPDATE Name = Name");
 
+        // Test users are mvv42 users: Telegram id derived from the local id (see Mvv42TestAuth.TelegramIdFor)
+        await conn.ExecuteAsync(
+            "UPDATE Users SET TelegramId = @Tg WHERE Id = @Id",
+            new[] { 1UL, 2UL }.Select(id => new { Id = id, Tg = Mvv42TestAuth.TelegramIdFor(id) }));
+
         // Seed balances in CurrencyBalances
         await conn.ExecuteAsync(@"
             INSERT INTO CurrencyBalances (AccountId, Currency, Amount)
@@ -87,7 +92,7 @@ public class DatabaseFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Inserts a user row if it doesn't exist yet (idempotent).
+    /// Inserts a user row (with its test Telegram id) if it doesn't exist yet (idempotent).
     /// Used by tests that operate under a userId other than 1 or 2.
     /// </summary>
     public async Task EnsureUserAsync(ulong userId)
@@ -95,10 +100,16 @@ public class DatabaseFixture : IAsyncLifetime
         await using var conn = new MySqlConnection(ConnectionString);
         await conn.OpenAsync();
         await conn.ExecuteAsync(@"
-            INSERT INTO Users (Id, Email, DisplayName, BaseCurrency)
-            VALUES (@Id, @Email, @DisplayName, 'RUB')
+            INSERT INTO Users (Id, TelegramId, Email, DisplayName, BaseCurrency)
+            VALUES (@Id, @TelegramId, @Email, @DisplayName, 'RUB')
             ON DUPLICATE KEY UPDATE Email = Email",
-            new { Id = userId, Email = $"user{userId}@test.com", DisplayName = $"User {userId}" });
+            new
+            {
+                Id = userId,
+                TelegramId = Mvv42TestAuth.TelegramIdFor(userId),
+                Email = $"user{userId}@test.com",
+                DisplayName = $"User {userId}",
+            });
     }
 
     /// <summary>

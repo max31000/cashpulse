@@ -1,24 +1,13 @@
+using CashPulse.Api.Auth;
 using CashPulse.Api.Endpoints;
 using CashPulse.Api.Middleware;
 using CashPulse.Infrastructure;
-using CashPulse.Infrastructure.Services;
+using Mvv42.Auth.Client;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// CORS — origins читаются из конфига, чтобы не хардкодить IP/домен в коде
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        var origins = builder.Configuration
-            .GetSection("Cors:AllowedOrigins")
-            .Get<string[]>()
-            ?? ["http://localhost:5173"];
-        policy.WithOrigins(origins)
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});
+// No CORS: the SPA calls the API same-origin (nginx /cashpulse/api/ in production, the Vite proxy in dev) — the
+// mvv42 access cookie is host-only and SameSite=Strict, so cross-origin callers could not authenticate anyway.
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -28,6 +17,16 @@ builder.Services.AddSwaggerGen(c =>
 
 // Infrastructure DI (repos, services, migration runner)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Shared mvv42 auth: access JWT from the mvv42 cookie (ES256, JWKS from mvv42-auth), policy `mvv42:app`
+// (apps ∋ cashpulse or adm) for every endpoint without explicit metadata. Local user = by `tg` (ICurrentUser).
+builder.Services.AddAuthentication(Mvv42Auth.Scheme);
+builder.Services.AddMvv42Auth("cashpulse", o => Mvv42AuthConfig.Bind(builder.Configuration, o));
+builder.Services.AddAuthorization(o => o.FallbackPolicy = o.GetPolicy(Mvv42Auth.Policy));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<UserProvisioning>();
+builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 
 // Configure JSON options: camelCase + string enums + DateOnly support
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -39,16 +38,10 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var app = builder.Build();
 
-// Fail fast if the JWT secret is missing/weak/default outside Development/Testing.
-// Runs after Build() so configuration overrides (e.g. WebApplicationFactory.UseSetting) are visible.
-JwtSecretGuard.EnsureValid(
-    app.Configuration["Jwt:Secret"],
-    app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"));
-
 // Middleware pipeline
-app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseMiddleware<ErrorHandlingMiddleware>();
-app.UseMiddleware<JwtMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -75,7 +68,6 @@ if (!app.Environment.IsEnvironment("Testing"))
 }
 
 // Map API endpoints
-app.MapAuthEndpoints();
 app.MapAccountsEndpoints();
 app.MapOperationsEndpoints();
 app.MapCategoriesEndpoints();
@@ -88,7 +80,8 @@ app.MapBalanceSnapshotsEndpoints();
 app.MapIncomeSourceEndpoints();
 
 // Health check
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+   .AllowAnonymous();
 
 app.Run();
 

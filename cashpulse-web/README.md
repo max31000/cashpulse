@@ -1,15 +1,15 @@
 # CashPulse Web — Frontend
 
-React 18 + TypeScript приложение, деплоится на GitHub Pages.
+React 19 + TypeScript SPA, отдаётся nginx на `https://mvv42.ru/cashpulse/` (в shell — во iframe).
 
 ## Технологии
 
-- React 18 + TypeScript
-- Mantine (UI компоненты)
+- React 19 + TypeScript
+- Mantine 9 + `@mvv42/kit` (дизайн-кит mvv42)
 - Recharts (графики)
 - Zustand (state management)
 - React Router v7
-- Yarn 4 (Berry)
+- Yarn 1
 - Vite
 
 ## Запуск
@@ -25,17 +25,15 @@ yarn typecheck  # проверка TypeScript типов без сборки
 
 | Переменная | Описание | По умолчанию |
 |------------|----------|--------------|
-| `VITE_API_URL` | URL бэкенда | `http://localhost:5000` |
+| `VITE_API_URL` | Префикс API того же origin (запросы идут на `${VITE_API_URL}/api/…`) | `/cashpulse` |
 
-Для локальной разработки создать `.env`:
-```
-VITE_API_URL=http://localhost:5000
-```
+API и вход — same-origin (общий mvv42-аккаунт, httpOnly cookie). В dev Vite проксирует `/cashpulse/api` →
+`http://localhost:5000/api` и `/auth` → `http://localhost:5010` (`CASHPULSE_API_TARGET`, `MVV42_AUTH_TARGET`).
 
-## GitHub Pages
+UI собран на [`@mvv42/kit`](https://github.com/max31000/mvv42-kit): `Mvv42Provider` (accent `blue`), `AppLayout`,
+`Page`/`Section`/`Metric`, `@mvv42/kit/charts`; платформенный клиент (`apiJson`, `requestLogin`, `useMe`). Своих
+логина, темы и переключателя темы нет — их дают shell и кит.
 
-Приложение деплоится на `https://max31000.github.io/cashpulse/`.
+## Деплой
 
-Vite base path: `/cashpulse/` (настроено в `vite.config.ts`).
-
-SPA routing реализован через `public/404.html` (GitHub Pages redirect hack).
+`.github/workflows/deploy.yml` (job `frontend`, после `backend`): сборка → `/var/www/cashpulse`. Vite base: `/cashpulse/`.
