@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { ApiError } from '@mvv42/kit/platform';
 import { server } from '../test/msw-handlers';
@@ -81,13 +81,6 @@ describe('apiClient', () => {
   });
 
   it('401 then a successful refresh retries once and succeeds', async () => {
-    // jsdom's AbortSignal is not accepted by Node's fetch: drop the kit's refresh timeout signal here.
-    // TODO(kit >= 0.1.2): remove once the kit's jsdom AbortSignal fix is in.
-    const timeout = AbortSignal.timeout;
-    (AbortSignal as { timeout?: unknown }).timeout = undefined;
-    onTestFinished(() => {
-      AbortSignal.timeout = timeout;
-    });
     let calls = 0;
     server.use(
       http.get('*/cashpulse/api/accounts', () => {

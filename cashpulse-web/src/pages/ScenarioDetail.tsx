@@ -11,6 +11,7 @@ import { useOperationStore } from '../store/useOperationStore';
 import { useCategoryStore } from '../store/useCategoryStore';
 import { OperationForm } from '../components/OperationForm/OperationForm';
 import { OperationList } from '../components/OperationList/OperationList';
+import { ListSkeleton } from '../components/RouterListRow';
 import { toggleScenario } from '../api/scenarios';
 import { confirmOperation, deleteOperation } from '../api/operations';
 import type { PlannedOperation } from '../api/types';
@@ -90,7 +91,7 @@ export default function ScenarioDetail() {
 
   return (
     <Page
-      eyebrow={<Link to="/scenarios" className="cp-link">← Сценарии</Link>}
+      eyebrow={<Link to="/scenarios" className="mvv-link">← Сценарии</Link>}
       title={scenario.name}
       description={scenario.description || undefined}
       width="wide"
@@ -105,13 +106,7 @@ export default function ScenarioDetail() {
     >
       <Section title="Операции сценария" description="Учитываются в прогнозе, пока сценарий активен" padding="none">
         {opLoading ? (
-          <div className="cp-list">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="cp-list-item">
-                <Skeleton h={24} />
-              </div>
-            ))}
-          </div>
+          <ListSkeleton rows={3} height={24} />
         ) : operations.length === 0 ? (
           <EmptyState
             compact

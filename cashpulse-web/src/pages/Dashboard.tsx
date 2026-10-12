@@ -1,52 +1,48 @@
 import { useEffect } from 'react';
-import { Accordion, ActionIcon, Badge, Progress, Skeleton, Table, Text, Tooltip } from '@mantine/core';
+import { Accordion, ActionIcon, Table, Text, Tooltip } from '@mantine/core';
 import { Link } from 'react-router-dom';
 import { notifications } from '@mantine/notifications';
-import { EmptyState, ErrorState, Metric, MetricGrid, Page, Section } from '@mvv42/kit';
-import { IconBuildingBank, IconCalendarEvent, IconCheck, IconRepeat } from '@tabler/icons-react';
+import { DataList, EmptyState, ErrorState, ListRow, Metric, MetricGrid, Page, Section } from '@mvv42/kit';
+import { IconBuildingBank, IconCalendarEvent, IconCheck } from '@tabler/icons-react';
 import { useAccountStore } from '../store/useAccountStore';
 import { useForecastStore } from '../store/useForecastStore';
 import { useOperationStore } from '../store/useOperationStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { ForecastChart } from '../components/ForecastChart/ForecastChart';
 import { AlertsPanel } from '../components/AlertsPanel/AlertsPanel';
+import { ListSkeleton, RouterListRow } from '../components/RouterListRow';
 import { confirmOperation } from '../api/operations';
 import type { Account } from '../api/types';
 import { formatMoney, formatMoneyWithSign } from '../utils/formatMoney';
 import { formatDateFull, formatDateCompact, toISODateString, formatMonth } from '../utils/formatDate';
-import { accountTypeLabels, tagColor } from '../utils/colors';
+import { accountTypeLabels } from '../utils/colors';
 import { creditUsage, daysUntilDue } from '../utils/accounts';
 
 function AccountRow({ acc }: { acc: Account }) {
   const main = acc.balances[0];
   const usedPercent = creditUsage(acc);
   const daysLeft = daysUntilDue(acc);
+  const extra = acc.balances.slice(1).map((b) => formatMoney(b.amount, b.currency)).join(' · ');
   return (
-    <Link to={`/accounts/${acc.id}`} className="cp-acc-row">
-      <span className="cp-acc-line">
-        <span className="cp-acc-name cp-truncate">{acc.name}</span>
-        <span className="cp-acc-balance mvv-num cp-amount" data-sign={main && main.amount < 0 ? 'neg' : undefined}>
-          {main ? formatMoney(main.amount, main.currency) : '—'}
-        </span>
-      </span>
-      <span className="cp-acc-line">
-        <Text span fz="xs" c="dimmed">
+    <RouterListRow
+      to={`/accounts/${acc.id}`}
+      title={acc.name}
+      description={
+        <>
           {accountTypeLabels[acc.type]}
           {usedPercent != null && ` · лимит ${usedPercent.toFixed(0)}%`}
           {daysLeft != null && (
-            <Text span fz="xs" c={daysLeft <= 7 ? 'red' : 'dimmed'}>{` · оплата через ${daysLeft} дн.`}</Text>
+            <Text span inherit c={daysLeft <= 7 ? 'red' : undefined}>{` · оплата через ${daysLeft} дн.`}</Text>
           )}
-        </Text>
-        {acc.balances.length > 1 && (
-          <Text span fz="xs" c="dimmed" className="mvv-num">
-            {acc.balances.slice(1).map((b) => formatMoney(b.amount, b.currency)).join(' · ')}
-          </Text>
-        )}
-      </span>
-      {usedPercent != null && (
-        <Progress value={usedPercent} color={usedPercent > 80 ? 'red' : 'blue'} size="xs" aria-label="Использование лимита" />
-      )}
-    </Link>
+          {extra && ` · ${extra}`}
+        </>
+      }
+      value={
+        <span className="cp-amount" data-sign={main && main.amount < 0 ? 'neg' : undefined}>
+          {main ? formatMoney(main.amount, main.currency) : '—'}
+        </span>
+      }
+    />
   );
 }
 
@@ -140,13 +136,7 @@ export default function Dashboard() {
 
           <Section title="По месяцам" description="Доходы, расходы и баланс на конец месяца" padding="none">
             {fcLoading ? (
-              <div className="cp-list">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="cp-list-item">
-                    <Skeleton h={20} />
-                  </div>
-                ))}
-              </div>
+              <ListSkeleton rows={4} height={20} />
             ) : !forecast?.monthlyBreakdown?.length ? (
               <EmptyState compact title="Нет данных" description="Добавьте счета и плановые операции — здесь появится разбивка по месяцам." />
             ) : (
@@ -199,63 +189,56 @@ export default function Dashboard() {
 
           <Section title="Ближайшие операции" description="Неподтверждённые, на 30 дней вперёд" padding="none">
             {opLoading ? (
-              <div className="cp-list">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="cp-list-item">
-                    <Skeleton h={20} />
-                  </div>
-                ))}
-              </div>
+              <ListSkeleton rows={3} height={20} />
             ) : upcomingOps.length === 0 ? (
               <EmptyState compact icon={<IconCalendarEvent size={22} />} title="Нет плановых операций" description="Запланированные платежи и поступления появятся здесь." />
             ) : (
               <>
-                <ul className="cp-list">
+                <DataList>
                   {upcomingOps.map((op) => (
-                    <li key={op.id} className="cp-list-item">
-                      <span className="cp-list-date mvv-num">{op.operationDate ? formatDateCompact(op.operationDate) : '—'}</span>
-                      <span className="cp-truncate cp-grow" title={op.description ?? undefined}>
-                        <Text span fz="sm" fw={500}>{op.description ?? `Операция #${op.id}`}</Text>
-                        {op.recurrenceRuleId && (
-                          <IconRepeat size={12} stroke={2} aria-label="Повторяющаяся" className="cp-inline-icon" />
-                        )}
-                        {op.tags?.[0] && (
-                          <Badge size="xs" variant="dot" color={tagColor(op.tags[0])} ml={6}>
-                            {op.tags[0]}
-                          </Badge>
-                        )}
-                      </span>
-                      <span className="cp-amount mvv-num" data-sign={op.amount >= 0 ? 'pos' : 'neg'}>
-                        <Text span fz="sm" fw={600} c="inherit">{formatMoneyWithSign(op.amount, op.currency)}</Text>
-                      </span>
-                      <Tooltip label="Подтвердить">
-                        <ActionIcon color="green" aria-label="Подтвердить" onClick={() => handleConfirm(op.id)}>
-                          <IconCheck size={16} stroke={1.75} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </li>
+                    <ListRow
+                      key={op.id}
+                      title={op.description ?? `Операция #${op.id}`}
+                      description={
+                        <>
+                          {op.operationDate ? formatDateCompact(op.operationDate) : '—'}
+                          {op.recurrenceRuleId && ' · повтор'}
+                          {op.tags?.length ? ` · ${op.tags.join(', ')}` : ''}
+                        </>
+                      }
+                      value={
+                        <span className="cp-amount" data-sign={op.amount >= 0 ? 'pos' : 'neg'}>
+                          {formatMoneyWithSign(op.amount, op.currency)}
+                        </span>
+                      }
+                      action={
+                        <Tooltip label="Подтвердить">
+                          <ActionIcon color="green" aria-label="Подтвердить" onClick={() => handleConfirm(op.id)}>
+                            <IconCheck size={16} stroke={1.75} />
+                          </ActionIcon>
+                        </Tooltip>
+                      }
+                    />
                   ))}
-                </ul>
-                <Link to="/operations" className="cp-list-link">Все операции →</Link>
+                </DataList>
+                <div className="cp-section-foot">
+                  <Link to="/operations" className="mvv-link">Все операции →</Link>
+                </div>
               </>
             )}
           </Section>
 
-          <Section title="Счета" actions={<Link to="/accounts" className="cp-link">Управление</Link>} padding="none">
+          <Section title="Счета" actions={<Link to="/accounts" className="mvv-link">Управление</Link>} padding="none">
             {accLoading ? (
-              <div className="cp-list">
-                {[1, 2].map((i) => (
-                  <div key={i} className="cp-list-item"><Skeleton h={36} /></div>
-                ))}
-              </div>
+              <ListSkeleton rows={2} height={36} />
             ) : accError && activeAccounts.length === 0 ? (
               <ErrorState compact error={accError} onRetry={() => void fetchAccounts()} />
             ) : activeAccounts.length === 0 ? (
               <EmptyState compact icon={<IconBuildingBank size={22} />} title="Нет счетов" description="Добавьте счёт, чтобы видеть капитал и прогноз." />
             ) : (
-              <div>
+              <DataList>
                 {activeAccounts.map((acc) => <AccountRow key={acc.id} acc={acc} />)}
-              </div>
+              </DataList>
             )}
           </Section>
         </div>

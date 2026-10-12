@@ -41,23 +41,6 @@
   flex: 1;
 }
 
-.cp-inline-icon {
-  margin-left: 6px;
-  vertical-align: -1px;
-  color: var(--mvv-text-3);
-}
-
-/* TODO(kit >= 0.1.2): replace with the kit TextLink. */
-.cp-link {
-  font-size: var(--mvv-fs-13);
-  color: var(--mvv-accent);
-  text-decoration: none;
-}
-
-.cp-link:hover {
-  text-decoration: underline;
-}
-
 .cp-dashboard {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -247,45 +230,12 @@
   }
 }
 
-/* ---------------------------------------------------------------- compact lists (dashboard)
- * TODO(kit >= 0.1.2): replace .cp-list / .cp-list-item / .cp-acc-row with the kit DataList. */
+/* ---------------------------------------------------------------- section footer link */
 
-.cp-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.cp-list-item {
-  display: flex;
-  align-items: center;
-  gap: var(--mvv-sp-3);
-  padding: var(--mvv-sp-2) var(--mvv-sp-5);
-  min-height: 44px;
-}
-
-.cp-list-item + .cp-list-item {
-  border-top: 1px solid var(--mvv-border);
-}
-
-.cp-list-link {
-  display: block;
+.cp-section-foot {
   padding: var(--mvv-sp-3) var(--mvv-sp-5);
   border-top: 1px solid var(--mvv-border);
   font-size: var(--mvv-fs-13);
-  color: var(--mvv-accent);
-  text-decoration: none;
-}
-
-.cp-list-link:hover {
-  background: var(--mvv-surface-hover);
-}
-
-.cp-list-date {
-  flex: none;
-  width: 44px;
-  font-size: var(--mvv-fs-12);
-  color: var(--mvv-text-3);
 }
 
 /* ---------------------------------------------------------------- account tiles */
@@ -401,45 +351,6 @@ a.cp-account:focus-visible {
   white-space: nowrap;
 }
 
-/* ---------------------------------------------------------------- dashboard account rows */
-
-.cp-acc-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: var(--mvv-sp-3) var(--mvv-sp-5);
-  color: inherit;
-  text-decoration: none;
-  transition: background-color var(--mvv-dur-fast) var(--mvv-ease);
-}
-
-.cp-acc-row + .cp-acc-row {
-  border-top: 1px solid var(--mvv-border);
-}
-
-.cp-acc-row:hover {
-  background: var(--mvv-surface-hover);
-}
-
-.cp-acc-row:focus-visible {
-  outline: 2px solid var(--mvv-focus-ring);
-  outline-offset: -2px;
-}
-
-.cp-acc-line {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--mvv-sp-3);
-}
-
-.cp-acc-name {
-  font-size: var(--mvv-fs-14);
-  font-weight: var(--mvv-fw-medium);
-}
-
-.cp-acc-balance {
-  flex: none;
-  font-size: var(--mvv-fs-15);
-  font-weight: var(--mvv-fw-semibold);
+.mvv-section-actions .mvv-link {
+  font-size: var(--mvv-fs-13);
 }

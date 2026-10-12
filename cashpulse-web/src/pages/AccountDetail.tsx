@@ -11,6 +11,7 @@ import { useCategoryStore } from '../store/useCategoryStore';
 import { useScenarioStore } from '../store/useScenarioStore';
 import { OperationForm } from '../components/OperationForm/OperationForm';
 import { OperationList } from '../components/OperationList/OperationList';
+import { ListSkeleton } from '../components/RouterListRow';
 import { confirmOperation, deleteOperation } from '../api/operations';
 import type { PlannedOperation } from '../api/types';
 import { formatMoney, formatMoneyWithSign } from '../utils/formatMoney';
@@ -103,7 +104,7 @@ export default function AccountDetail() {
 
   return (
     <Page
-      eyebrow={<Link to="/accounts" className="cp-link">← Счета</Link>}
+      eyebrow={<Link to="/accounts" className="mvv-link">← Счета</Link>}
       title={
         <Group gap="sm" component="span">
           {account.name}
@@ -161,13 +162,7 @@ export default function AccountDetail() {
         }
       >
         {opLoading ? (
-          <div className="cp-list">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="cp-list-item">
-                <Skeleton h={24} />
-              </div>
-            ))}
-          </div>
+          <ListSkeleton rows={4} height={24} />
         ) : operations.length === 0 ? (
           <EmptyState
             compact

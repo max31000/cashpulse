@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Group, SegmentedControl, Select, Skeleton, TextInput } from '@mantine/core';
+import { Button, Group, SegmentedControl, Select, TextInput } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { EmptyState, ErrorState, Page, Section } from '@mvv42/kit';
@@ -11,6 +11,7 @@ import { useScenarioStore } from '../store/useScenarioStore';
 import { useDebounce } from '../hooks/useDebounce';
 import { OperationForm } from '../components/OperationForm/OperationForm';
 import { OperationList } from '../components/OperationList/OperationList';
+import { ListSkeleton } from '../components/RouterListRow';
 import { confirmOperation, deleteOperation } from '../api/operations';
 import type { PlannedOperation } from '../api/types';
 import { getDateRange } from '../utils/formatDate';
@@ -183,13 +184,7 @@ export default function Operations() {
 
       <Section padding="none">
         {loading ? (
-          <div className="cp-list">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="cp-list-item">
-                <Skeleton h={24} />
-              </div>
-            ))}
-          </div>
+          <ListSkeleton rows={6} height={24} />
         ) : opError && operations.length === 0 ? (
           <ErrorState error={opError} onRetry={reload} />
         ) : filtered.length === 0 ? (
