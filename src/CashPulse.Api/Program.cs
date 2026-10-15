@@ -3,6 +3,11 @@ using CashPulse.Api.Endpoints;
 using CashPulse.Api.Middleware;
 using CashPulse.Infrastructure;
 using Mvv42.Auth.Client;
+using Prometheus;
+
+// Prometheus: process + .NET runtime metrics only; EventCounters and the .NET Meters adapter are off (too many
+// series). Must run before any metric is created.
+Metrics.SuppressDefaultMetrics(new SuppressDefaultMetricOptions { SuppressEventCounters = true, SuppressMeters = true });
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,9 +41,18 @@ builder.Services.ConfigureHttpJsonOptions(options =>
         new System.Text.Json.Serialization.JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase));
 });
 
+// /metrics is served by a separate KestrelMetricServer (container port 9091, published only on the host's
+// 127.0.0.1), never by the main app port behind nginx. Metrics:Port = 0 disables it.
+var metricsPort = builder.Configuration.GetValue("Metrics:Port", 9091);
+if (metricsPort > 0)
+    builder.Services.AddMetricServer(o => o.Port = (ushort)metricsPort);
+
 var app = builder.Build();
 
 // Middleware pipeline
+app.UseRouting();
+// HTTP metrics: endpoint = route template (never the raw path), status code reduced to 2xx/4xx/5xx.
+app.UseHttpMetrics(o => o.ReduceStatusCodeCardinality());
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<ErrorHandlingMiddleware>();
