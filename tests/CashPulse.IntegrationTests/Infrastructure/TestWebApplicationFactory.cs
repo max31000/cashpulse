@@ -48,6 +48,9 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
                 // Disable CBR exchange rate fetch during tests
                 ["ExchangeRates:CbrXmlUrl"] = "http://localhost:9999/does-not-exist",
                 ["ExchangeRates:RefreshIntervalHours"] = "99999",
+
+                // No separate Prometheus metric server (port 9091) in tests
+                ["Metrics:Port"] = "0",
             });
         });
 

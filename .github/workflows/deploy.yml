@@ -134,6 +134,7 @@ jobs:
                 --restart unless-stopped \
                 --label com.centurylinklabs.watchtower.enable=false \
                 -p 127.0.0.1:5000:5000 \
+                -p 127.0.0.1:9500:9091 \
                 -e "ConnectionStrings__DefaultConnection=${DB_CONNECTION_STRING}" \
                 "$1" > /dev/null
             }
